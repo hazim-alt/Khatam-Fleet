@@ -483,13 +483,13 @@ async function loadTrip() {
     });
   }
 
-  // Auto-select tab: if has Departed/Arrived trip, go to Delivery; else Pick Up
-  const hasDelivery = _allTrips.some(function(t){ return t.status === 'Departed' || t.status === 'Arrived'; });
-  const hasPickup   = _allTrips.some(function(t){ return t.status === 'Assigned'; });
+  // Auto-select tab: if has Departed/Arrived or leg2 Assigned trip, go to Delivery; else Pick Up
+  const hasDelivery = _allTrips.some(function(t){ return t.status === 'Departed' || t.status === 'Arrived' || (t.status === 'Assigned' && t.leg !== 1); });
+  const hasPickup   = _allTrips.some(function(t){ return t.status === 'Assigned' && t.leg === 1; });
 
   // Update tab badges
-  const pickupCount   = _allTrips.filter(function(t){ return t.status === 'Assigned'; }).length;
-  const deliveryCount = _allTrips.filter(function(t){ return t.status === 'Departed' || t.status === 'Arrived'; }).length;
+  const pickupCount   = _allTrips.filter(function(t){ return t.status === 'Assigned' && t.leg === 1; }).length;
+  const deliveryCount = _allTrips.filter(function(t){ return t.status === 'Departed' || t.status === 'Arrived' || (t.status === 'Assigned' && t.leg !== 1); }).length;
   document.getElementById('tab-pickup').textContent   = '🚚 Pick Up'   + (pickupCount   > 0 ? ' (' + pickupCount   + ')' : '');
   document.getElementById('tab-delivery').textContent = '📦 Delivery'  + (deliveryCount > 0 ? ' (' + deliveryCount + ')' : '');
 
@@ -1225,7 +1225,7 @@ let _dragPickupSrcIdx = null;
 function renderPickupList() {
   const content = document.getElementById('trip-content');
   content.innerHTML = '';
-  _pickupTrips = _allTrips.filter(function(t){ return t.status === 'Assigned'; })
+  _pickupTrips = _allTrips.filter(function(t){ return t.status === 'Assigned' && t.leg === 1; })
     .sort(function(a,b){ return (a.driver_sequence||0) - (b.driver_sequence||0); });
   if (!_pickupTrips.length) {
     content.innerHTML = '<div class="no-trip"><div class="icon">🚚</div><div style="font-weight:700;margin-bottom:.4rem">No Pick-Up Trips</div><div style="font-size:.8rem">Awaiting assignment from administrator.</div></div>';
@@ -1339,7 +1339,7 @@ function renderDeliveryList() {
   const content = document.getElementById('trip-content');
   content.innerHTML = '';
   _deliveryTrips = _allTrips
-    .filter(function(t){ return t.status === 'Departed' || t.status === 'Arrived'; })
+    .filter(function(t){ return t.status === 'Departed' || t.status === 'Arrived' || (t.status === 'Assigned' && t.leg !== 1); })
     .sort(function(a,b){ return (a.driver_sequence||0) - (b.driver_sequence||0); });
 
   if (!_deliveryTrips.length) {
