@@ -31,21 +31,32 @@ jobs:
           keytool -list -v -keystore build-driver/android.keystore \
             -alias khatam -storepass khatam123 | grep SHA256
 
+      - name: Setup Driver App Icon
+        run: |
+          sudo apt-get install -y imagemagick
+          mkdir -p build-driver/app/src/main/res/mipmap-mdpi
+          mkdir -p build-driver/app/src/main/res/mipmap-hdpi
+          mkdir -p build-driver/app/src/main/res/mipmap-xhdpi
+          mkdir -p build-driver/app/src/main/res/mipmap-xxhdpi
+          mkdir -p build-driver/app/src/main/res/mipmap-xxxhdpi
+          convert driver-icon.png -resize 48x48 build-driver/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert driver-icon.png -resize 72x72 build-driver/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert driver-icon.png -resize 96x96 build-driver/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert driver-icon.png -resize 144x144 build-driver/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert driver-icon.png -resize 192x192 build-driver/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
       - name: Create Android project
         run: |
           cd build-driver
           mkdir -p app/src/main/res/values
-
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
           EOF
-
           cat > settings.gradle << 'EOF'
           rootProject.name = "FleetDriver"
           include ':app'
           EOF
-
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
@@ -53,7 +64,6 @@ jobs:
           }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
-
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
@@ -82,14 +92,16 @@ jobs:
               implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
           }
           EOF
-
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.CAMERA"/>
               <uses-feature android:name="android.hardware.camera" android:required="false"/>
-              <application android:label="Fleet Driver" android:theme="@android:style/Theme.NoTitleBar">
+              <application
+                  android:label="Fleet Driver"
+                  android:icon="@mipmap/ic_launcher"
+                  android:theme="@android:style/Theme.NoTitleBar">
                   <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
                       <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://khatam-apps.hazim-e70.workers.dev/driver-app.html"/>
                       <intent-filter>
@@ -106,7 +118,6 @@ jobs:
               </application>
           </manifest>
           EOF
-
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -149,21 +160,37 @@ jobs:
             -dname "CN=Khatam Receive, OU=IT, O=Khatam, L=KL, S=KL, C=MY" \
             -storepass khatam123 -keypass khatam123
 
+      - name: Print keystore fingerprint
+        run: |
+          keytool -list -v -keystore build-receive/android.keystore \
+            -alias khatam -storepass khatam123 | grep SHA256
+
+      - name: Setup Receive App Icon
+        run: |
+          sudo apt-get install -y imagemagick
+          mkdir -p build-receive/app/src/main/res/mipmap-mdpi
+          mkdir -p build-receive/app/src/main/res/mipmap-hdpi
+          mkdir -p build-receive/app/src/main/res/mipmap-xhdpi
+          mkdir -p build-receive/app/src/main/res/mipmap-xxhdpi
+          mkdir -p build-receive/app/src/main/res/mipmap-xxxhdpi
+          convert receive-icon.png -resize 48x48 build-receive/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert receive-icon.png -resize 72x72 build-receive/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert receive-icon.png -resize 96x96 build-receive/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert receive-icon.png -resize 144x144 build-receive/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert receive-icon.png -resize 192x192 build-receive/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
       - name: Create Android project
         run: |
           cd build-receive
           mkdir -p app/src/main/res/values
-
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
           EOF
-
           cat > settings.gradle << 'EOF'
           rootProject.name = "KhatamReceive"
           include ':app'
           EOF
-
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
@@ -171,7 +198,6 @@ jobs:
           }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
-
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
@@ -200,14 +226,16 @@ jobs:
               implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
           }
           EOF
-
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.CAMERA"/>
               <uses-feature android:name="android.hardware.camera" android:required="false"/>
-              <application android:label="Khatam Receive" android:theme="@android:style/Theme.NoTitleBar">
+              <application
+                  android:label="Khatam Receive"
+                  android:icon="@mipmap/ic_launcher"
+                  android:theme="@android:style/Theme.NoTitleBar">
                   <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
                       <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://khatam-apps.hazim-e70.workers.dev/receive-app.html"/>
                       <intent-filter>
@@ -224,7 +252,6 @@ jobs:
               </application>
           </manifest>
           EOF
-
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
