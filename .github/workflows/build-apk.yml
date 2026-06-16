@@ -36,7 +36,7 @@ jobs:
       - name: Build Driver APK
         working-directory: driver
         run: |
-          bubblewrap build --skipPwaValidation
+          echo "No" | bubblewrap build --skipPwaValidation
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: khatam123
           BUBBLEWRAP_KEY_PASSWORD: khatam123
@@ -77,7 +77,7 @@ jobs:
       - name: Build Receive APK
         working-directory: receive
         run: |
-          bubblewrap build --skipPwaValidation
+          echo "No" | bubblewrap build --skipPwaValidation
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: khatam123
           BUBBLEWRAP_KEY_PASSWORD: khatam123
