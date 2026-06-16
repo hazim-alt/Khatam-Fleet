@@ -17,12 +17,6 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli
 
@@ -33,14 +27,9 @@ jobs:
             -dname "CN=Khatam Fleet, OU=IT, O=Khatam, L=KL, S=KL, C=MY" \
             -storepass khatam123 -keypass khatam123
 
-      - name: Set JDK path in manifest
-        working-directory: driver
-        run: |
-          jq --arg jdk "$JAVA_HOME" '.jdkPath = $jdk' twa-manifest.json > tmp.json && mv tmp.json twa-manifest.json
-
       - name: Build Driver APK
         working-directory: driver
-        run: bubblewrap build --skipPwaValidation
+        run: yes | bubblewrap build --skipPwaValidation
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: khatam123
           BUBBLEWRAP_KEY_PASSWORD: khatam123
@@ -62,12 +51,6 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli
 
@@ -78,14 +61,9 @@ jobs:
             -dname "CN=Khatam Receive, OU=IT, O=Khatam, L=KL, S=KL, C=MY" \
             -storepass khatam123 -keypass khatam123
 
-      - name: Set JDK path in manifest
-        working-directory: receive
-        run: |
-          jq --arg jdk "$JAVA_HOME" '.jdkPath = $jdk' twa-manifest.json > tmp.json && mv tmp.json twa-manifest.json
-
       - name: Build Receive APK
         working-directory: receive
-        run: bubblewrap build --skipPwaValidation
+        run: yes | bubblewrap build --skipPwaValidation
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: khatam123
           BUBBLEWRAP_KEY_PASSWORD: khatam123
