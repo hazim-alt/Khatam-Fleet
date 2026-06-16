@@ -1,0 +1,89 @@
+name: Build Khatam APKs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-driver:
+    name: Build Fleet Driver APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Generate keystore
+        run: |
+          keytool -genkey -v -keystore driver/android.keystore \
+            -alias khatam -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Khatam Fleet, OU=IT, O=Khatam, L=KL, S=KL, C=MY" \
+            -storepass khatam123 -keypass khatam123
+
+      - name: Build Driver APK
+        working-directory: driver
+        run: |
+          bubblewrap build --skipPwaValidation
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: khatam123
+          BUBBLEWRAP_KEY_PASSWORD: khatam123
+
+      - name: Upload Driver APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: fleet-driver-apk
+          path: driver/app-release-signed.apk
+
+  build-receive:
+    name: Build Khatam Receive APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Generate keystore
+        run: |
+          keytool -genkey -v -keystore receive/android.keystore \
+            -alias khatam -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Khatam Receive, OU=IT, O=Khatam, L=KL, S=KL, C=MY" \
+            -storepass khatam123 -keypass khatam123
+
+      - name: Build Receive APK
+        working-directory: receive
+        run: |
+          bubblewrap build --skipPwaValidation
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: khatam123
+          BUBBLEWRAP_KEY_PASSWORD: khatam123
+
+      - name: Upload Receive APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: khatam-receive-apk
+          path: receive/app-release-signed.apk
