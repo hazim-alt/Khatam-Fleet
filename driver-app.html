@@ -468,15 +468,18 @@ async function loadTrip() {
   if (leg1Trips.length) {
     var leg1DoNos = leg1Trips.map(function(t){ return t.do_no; });
     var { data: sreqs } = await sb.from('stock_requests')
-      .select('do_no, fulfiller:to_boutique_id(name)')
+      .select('do_no, fulfiller:to_boutique_id(name), dest:from_boutique_id(name)')
       .in('do_no', leg1DoNos)
       .limit(leg1DoNos.length * 5);
     var doFulfillerMap = {};
+    var doDestMap = {};
     (sreqs || []).forEach(function(r){
       if (r.do_no && r.fulfiller && r.fulfiller.name) doFulfillerMap[r.do_no] = r.fulfiller.name;
+      if (r.do_no && r.dest && r.dest.name) doDestMap[r.do_no] = r.dest.name;
     });
     _allTrips.forEach(function(t){
       if (t.leg === 1 && t.do_no && doFulfillerMap[t.do_no]) t._pickupName = doFulfillerMap[t.do_no];
+      if (t.leg === 1 && t.do_no && doDestMap[t.do_no]) t._destBoutique = doDestMap[t.do_no];
     });
   }
 
@@ -1489,8 +1492,8 @@ function buildDeliveryItem(trip, idx) {
     + (!isArrived ? '<span class="delivery-eta">ETA ' + etaStr + '</span>' : '')
     + '</div>'
     + '<div class="delivery-dest">'
-      + (trip.leg === 1 ? '<span style="font-size:.65rem;color:#6366f1;font-weight:600">🏭 PICKUP: </span>' : '')
-      + (trip.leg === 1 ? (trip._pickupName || trip.destination || '—') : (trip.destination || '—'))
+      + (trip.leg === 1 ? '<span style="font-size:.65rem;color:#10b981;font-weight:600">📦 DELIVER TO: </span>' : '')
+      + (trip.leg === 1 ? (trip._destBoutique || trip.destination || '—') : (trip.destination || '—'))
       + '</div>'
     + '<div class="delivery-status">' + statusText + '</div>'
     + '<div class="delivery-actions">' + actionHTML + '</div>';
