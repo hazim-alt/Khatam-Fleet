@@ -31,6 +31,11 @@ jobs:
           cd build-driver
           mkdir -p app/src/main/res/values
 
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+
           cat > settings.gradle << 'EOF'
           rootProject.name = "FleetDriver"
           include ':app'
@@ -143,6 +148,11 @@ jobs:
         run: |
           cd build-receive
           mkdir -p app/src/main/res/values
+
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
 
           cat > settings.gradle << 'EOF'
           rootProject.name = "KhatamReceive"
