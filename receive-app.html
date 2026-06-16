@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0f172a"/>
+<link rel="manifest" href="receive-manifest.json"/>
+<link rel="apple-touch-icon" href="icon-receive-192.png"/>
+<title>Boutique Receive</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0f172a;--card:#1e293b;--border:#334155;--text:#f1f5f9;--muted:#94a3b8;
+  --accent:#6366f1;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;--blue:#3b82f6;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* SCREENS */
+.screen{display:none;padding:1.5rem 1rem 2rem;min-height:100vh;flex-direction:column;align-items:center}
+.screen.active{display:flex}
+#screen-login.active{justify-content:center}
+#screen-boutique-pick.active{justify-content:center}
+#screen-home.active{justify-content:flex-start;padding-top:1.5rem}
+#screen-scan.active{justify-content:flex-start;padding:0}
+
+/* LOGIN */
+.login-logo{font-size:3rem;margin-bottom:.5rem;text-align:center}
+.login-title{font-size:1.3rem;font-weight:800;margin-bottom:.25rem;text-align:center}
+.login-sub{font-size:.8rem;color:var(--muted);margin-bottom:2rem;text-align:center}
+.login-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:380px}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.75rem;font-weight:600;color:var(--muted);margin-bottom:.4rem}
+.field input{width:100%;padding:.75rem 1rem;background:#0f172a;border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;outline:none}
+.field input:focus{border-color:var(--accent)}
+.err-msg{color:var(--red);font-size:.75rem;margin-bottom:.75rem;display:none;text-align:center}
+.btn-full{width:100%;padding:.85rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer}
+.btn-full:disabled{opacity:.5}
+
+/* BOUTIQUE PICKER */
+.picker-title{font-size:1.1rem;font-weight:800;margin-bottom:.25rem;text-align:center}
+.picker-sub{font-size:.8rem;color:var(--muted);margin-bottom:1.5rem;text-align:center}
+.picker-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:380px}
+.boutique-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:#0f172a;border:1px solid var(--border);border-radius:10px;margin-bottom:.6rem;cursor:pointer;transition:border-color .15s}
+.boutique-item:hover{border-color:var(--accent)}
+.boutique-item .b-name{font-size:.88rem;font-weight:600}
+.boutique-item .b-arrow{margin-left:auto;color:var(--muted);font-size:.9rem}
+
+/* HOME */
+.home-header{width:100%;max-width:420px;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.greet-name{font-size:.95rem;font-weight:700}
+.greet-boutique{font-size:.72rem;color:var(--accent);margin-top:.1rem}
+.logout-btn{background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.72rem;padding:.3rem .65rem;cursor:pointer}
+.section-title{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;width:100%;max-width:420px}
+.delivery-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.25rem 1.25rem;width:100%;max-width:420px;margin-bottom:.75rem;position:relative}
+.dc-status{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .6rem;border-radius:20px;font-size:.68rem;font-weight:700;margin-bottom:.65rem}
+.dc-status.arrived{background:#10b98120;color:var(--green);border:1px solid #10b98140}
+.dc-status.transit{background:#3b82f620;color:var(--blue);border:1px solid #3b82f640}
+.dc-route{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
+.dc-route-from{font-size:.8rem;font-weight:600;color:var(--muted);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc-route-arrow{font-size:.7rem;color:var(--muted);flex-shrink:0}
+.dc-route-to{font-size:.8rem;font-weight:700;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.dc-do{font-size:.82rem;font-weight:800;font-family:monospace;color:var(--accent);margin-bottom:.3rem}
+.dc-meta{font-size:.7rem;color:var(--muted);margin-bottom:.85rem}
+.dc-carton{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:20px;font-size:.7rem;font-weight:700;margin-bottom:.85rem}
+.dc-carton.has{background:#6366f115;border:1px solid var(--accent);color:var(--accent)}
+.dc-carton.none{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-receive{width:100%;padding:.8rem;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;letter-spacing:.02em}
+.no-delivery{text-align:center;padding:3rem 1rem;color:var(--muted);width:100%;max-width:420px}
+.no-delivery .icon{font-size:3rem;margin-bottom:.75rem;opacity:.3}
+.refresh-btn{margin-top:1rem;padding:.55rem 1.2rem;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.8rem;cursor:pointer}
+
+/* SCAN SCREEN */
+.scan-topbar{width:100%;background:var(--card);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem;position:sticky;top:0;z-index:10}
+.scan-back{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:.2rem}
+.scan-title{font-size:.9rem;font-weight:700;flex:1}
+.scan-do{font-size:.7rem;color:var(--accent);font-family:monospace}
+
+.camera-wrap{width:100%;position:relative;background:#000;overflow:hidden}
+#reader{width:100%;max-height:260px;overflow:hidden}
+#reader video{width:100%!important;max-height:260px;object-fit:cover}
+#reader__dashboard_section_swaplink{display:none!important}
+#reader__status_span{font-size:.7rem!important;color:var(--muted)!important}
+.scan-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:140px;border:2px solid var(--accent);border-radius:10px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
+.scan-line{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanline 1.8s ease-in-out infinite}
+@keyframes scanline{0%,100%{top:0}50%{top:calc(100% - 2px)}}
+
+.scan-status-bar{width:100%;padding:.65rem 1rem;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.scan-progress{font-size:.82rem;font-weight:700}
+.scan-progress span{color:var(--green)}
+.beep-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:background .15s}
+.beep-dot.success{background:var(--green)}
+.beep-dot.error{background:var(--red)}
+.beep-dot.dup{background:var(--yellow)}
+
+.scan-feed{padding:.75rem 1rem 9rem;flex:1;overflow-y:auto;width:100%}
+.scan-item{display:flex;align-items:center;gap:.65rem;padding:.6rem .75rem;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:.5rem;animation:slideIn .2s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.scan-item.ok{border-color:var(--green)}
+.scan-item.err{border-color:var(--red)}
+.scan-icon{font-size:1.1rem;flex-shrink:0}
+.scan-info{flex:1;min-width:0}
+.scan-barcode{font-size:.75rem;font-family:monospace;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scan-note{font-size:.68rem;color:var(--muted);margin-top:.1rem}
+.scan-time{font-size:.65rem;color:var(--muted);flex-shrink:0}
+
+.manual-bar{padding:.65rem 1rem;background:var(--card);border-top:1px solid var(--border);display:flex;gap:.5rem;width:100%;position:sticky;bottom:0}
+.manual-bar input{flex:1;padding:.6rem .75rem;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;outline:none}
+.manual-bar input:focus{border-color:var(--accent)}
+.manual-bar button{padding:.6rem 1rem;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:.8rem;font-weight:700;cursor:pointer}
+
+.scan-footer{position:fixed;bottom:0;left:0;right:0;padding:.75rem 1rem;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.4rem}
+.btn-confirm-receive{width:100%;padding:.85rem;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;opacity:.4;pointer-events:none;transition:opacity .2s}
+.btn-confirm-receive.ready{opacity:1;pointer-events:auto}
+.scan-manual-row{display:flex;gap:.5rem}
+.scan-manual-row input{flex:1;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none}
+.scan-manual-row input:focus{border-color:var(--accent)}
+.scan-manual-row button{padding:.65rem 1rem;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:.82rem;font-weight:700;cursor:pointer}
+
+/* TOAST */
+.toast{position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:.6rem 1.2rem;border-radius:20px;font-size:.8rem;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid var(--border)}
+.toast.show{opacity:1}
+
+/* SIGNATURE MODAL */
+.sig-modal{position:fixed;inset:0;background:rgba(15,23,42,.92);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.sig-sheet{background:var(--card);border-radius:20px 20px 0 0;padding:1.25rem 1rem 2.5rem;width:100%;max-width:480px}
+.sig-title{font-size:1rem;font-weight:800;margin-bottom:.2rem}
+.sig-sub{font-size:.78rem;color:var(--muted);margin-bottom:1.1rem}
+.sig-canvas-wrap{position:relative;background:#fff;border-radius:10px;margin-bottom:.75rem;overflow:hidden}
+#sig-canvas{display:block;width:100%;cursor:crosshair;touch-action:none}
+.sig-clear{position:absolute;top:.4rem;right:.4rem;background:rgba(15,23,42,.7);border:none;color:#fff;border-radius:6px;font-size:.7rem;padding:.2rem .55rem;cursor:pointer}
+.sig-submit{width:100%;padding:.85rem;background:var(--green);color:#fff;border:none;border-radius:12px;font-size:.95rem;font-weight:700;cursor:pointer;margin-top:.4rem}
+.sig-cancel{width:100%;padding:.65rem;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:12px;font-size:.85rem;cursor:pointer;margin-top:.5rem}
+
+/* LOADING */
+.loading-wrap{display:flex;align-items:center;justify-content:center;padding:2rem;width:100%;max-width:420px}
+.spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TABS */
+.tab-bar{display:flex;gap:.35rem;width:100%;max-width:420px;margin-bottom:1rem;background:var(--card);border-radius:12px;padding:.3rem;border:1px solid var(--border)}
+.tab-btn{flex:1;padding:.5rem;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);transition:background .15s,color .15s}
+.tab-btn.active{background:var(--accent);color:#fff}
+
+/* HISTORY CARDS */
+.hist-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;width:100%;max-width:420px;margin-bottom:.65rem}
+.hist-do{font-size:.82rem;font-weight:800;font-family:monospace;color:var(--accent);margin-bottom:.2rem}
+.hist-meta{font-size:.7rem;color:var(--muted);margin-bottom:.5rem}
+.hist-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.18rem .5rem;border-radius:20px;font-size:.68rem;font-weight:700;background:#10b98120;color:var(--green);border:1px solid #10b98140}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="screen active" id="screen-login">
+  <div class="login-logo">📦</div>
+  <div class="login-title">Boutique Receiving</div>
+  <div class="login-sub">Log masuk untuk mula penerimaan</div>
+  <div class="login-card">
+    <div class="err-msg" id="login-err">Username atau password salah.</div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="Masukkan username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <div style="position:relative">
+        <input type="password" id="login-pass" placeholder="Masukkan password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:2.5rem"/>
+        <button type="button" onclick="togglePw()" style="position:absolute;right:.65rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;color:var(--muted);padding:0;line-height:1" id="pw-eye">👁</button>
+      </div>
+    </div>
+    <button class="btn-full" id="login-btn" onclick="doLogin()">Log Masuk</button>
+  </div>
+</div>
+
+<!-- BOUTIQUE PICKER (admin only) -->
+<div class="screen" id="screen-boutique-pick">
+  <div style="font-size:2rem;margin-bottom:.5rem;text-align:center">🏪</div>
+  <div class="picker-title">Pilih Butik</div>
+  <div class="picker-sub">Log masuk sebagai admin — pilih butik untuk terima penghantaran</div>
+  <div class="picker-card">
+    <div id="boutique-pick-list"><div class="loading-wrap"><div class="spinner"></div></div></div>
+  </div>
+  <button class="logout-btn" style="margin-top:1.25rem" onclick="doLogout()">← Log Keluar</button>
+</div>
+
+<!-- HOME -->
+<div class="screen" id="screen-home">
+  <div class="home-header">
+    <div>
+      <div class="greet-name" id="greet-name">—</div>
+      <div class="greet-boutique" id="greet-boutique">—</div>
+    </div>
+    <div style="display:flex;gap:.4rem;align-items:center">
+      <button class="logout-btn" id="btn-change-boutique" onclick="changeBoutique()" style="display:none">🏪 Tukar</button>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="rtab-pending" onclick="switchReceiveTab('pending')">📦 Pending</button>
+    <button class="tab-btn" id="rtab-history" onclick="switchReceiveTab('history')">📋 History</button>
+  </div>
+  <div id="receive-tab-content" style="width:100%;max-width:420px">
+    <div class="loading-wrap"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- SCAN -->
+<div class="screen" id="screen-scan" style="padding:0">
+  <div class="scan-topbar">
+    <button class="scan-back" onclick="closeScan()">←</button>
+    <div>
+      <div class="scan-title">Imbas Karton</div>
+      <div class="scan-do" id="scan-do-label">—</div>
+    </div>
+    <div class="beep-dot" id="beep-dot"></div>
+  </div>
+
+  <div class="camera-wrap">
+    <div id="reader"></div>
+    <div class="scan-overlay"><div class="scan-line"></div></div>
+  </div>
+
+  <div class="scan-status-bar">
+    <div>
+      <div class="scan-progress">Diimbas: <span id="scan-count" style="color:var(--green);font-size:1.2rem;font-weight:800">0</span> / <span id="scan-total">?</span> karton</div>
+      <div style="font-size:.68rem;color:var(--muted)">Imbas QR kod karton</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <div id="scan-status-msg" style="font-size:.72rem;color:var(--muted);text-align:right"></div>
+      <div class="beep-dot" id="beep-dot"></div>
+    </div>
+  </div>
+
+  <div class="scan-feed" id="scan-feed"></div>
+
+  <div class="scan-footer">
+    <button class="btn-confirm-receive" id="confirm-btn" onclick="openSignatureModal()">✅ Sahkan Penerimaan</button>
+    <div class="scan-manual-row">
+      <input type="text" id="manual-input" placeholder="Input manual / external scanner..." inputmode="none" autocomplete="off" autocorrect="off"/>
+      <button onclick="addManualScan()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- SIGNATURE MODAL -->
+<div id="sig-modal" class="sig-modal" style="display:none">
+  <div class="sig-sheet">
+    <div class="sig-title">✍️ Pengesahan Penerimaan</div>
+    <div class="sig-sub">Sila isikan nama dan tandatangan penerima</div>
+    <div class="field" style="margin-bottom:.85rem">
+      <label>Nama Penerima</label>
+      <input type="text" id="sig-name" placeholder="Nama penuh penerima..." autocomplete="off"/>
+    </div>
+    <div style="font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:.35rem">Tandatangan</div>
+    <div class="sig-canvas-wrap">
+      <canvas id="sig-canvas" height="160"></canvas>
+      <button class="sig-clear" onclick="clearSig()">✕ Clear</button>
+    </div>
+    <button class="sig-submit" onclick="submitSignature()">✅ Sahkan &amp; Simpan</button>
+    <button class="sig-cancel" onclick="closeSignatureModal()">Batal</button>
+  </div>
+</div>
+
+<script>
+const SUPA_URL = 'https://lrathqgqspkiiwumsoar.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyYXRocWdxc3BraWl3dW1zb2FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTk4OTIsImV4cCI6MjA5NjQ5NTg5Mn0.UIu3uMD5SXZ4WyzCuKt27iJvEvL4FO2a-Tg9-cHbaNg';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let _user = null;
+let _scanner = null;
+let _scans = [];          // received cartons this session
+let _currentDelivery = null;  // { doNo, batchNo, requestIds, expectedCartons, fromName }
+let _allCartons = [];     // registered cartons for current delivery
+
+// ── UTILS ────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+
+function showToast(msg, dur) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, dur || 2500);
+}
+
+function fmtTime(d) {
+  return d.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// ── TOGGLE PASSWORD ───────────────────────────────
+function togglePw() {
+  var inp = document.getElementById('login-pass');
+  var btn = document.getElementById('pw-eye');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁'; }
+}
+
+// ── SHA256 ────────────────────────────────────────
+async function sha256hex(text) {
+  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+// ── AUTH ─────────────────────────────────────────
+async function doLogin() {
+  var user = document.getElementById('login-user').value.trim();
+  var pass = document.getElementById('login-pass').value;
+  var btn  = document.getElementById('login-btn');
+  var err  = document.getElementById('login-err');
+  if (!user || !pass) { err.style.display='block'; err.textContent='Sila isi semua maklumat.'; return; }
+  btn.disabled = true; btn.textContent = 'Loading...';
+  err.style.display = 'none';
+
+  var hash = await sha256hex(pass);
+  var { data: users } = await sb.from('app_users')
+    .select('id, username, full_name, role, boutique_id, boutique:boutique_id(name)')
+    .eq('username', user).eq('password_hash', hash).limit(1);
+
+  if (!users || !users.length) {
+    err.style.display = 'block'; err.textContent = 'Username atau password salah.';
+    btn.disabled = false; btn.textContent = 'Log Masuk'; return;
+  }
+
+  _user = users[0];
+  localStorage.setItem('receive_user', JSON.stringify(_user));
+  btn.disabled = false; btn.textContent = 'Log Masuk';
+
+  // Admin (no boutique_id) → show boutique picker
+  if (!_user.boutique_id) {
+    showScreen('screen-boutique-pick');
+    loadBoutiquePicker();
+  } else {
+    document.getElementById('greet-name').textContent = _user.full_name || _user.username;
+    document.getElementById('greet-boutique').textContent = _user.boutique ? _user.boutique.name : '—';
+    showScreen('screen-home');
+    loadDeliveries();
+  }
+}
+
+// ── BOUTIQUE PICKER ───────────────────────────────
+async function loadBoutiquePicker() {
+  var el = document.getElementById('boutique-pick-list');
+  var { data: boutiques } = await sb.from('boutiques').select('id, name').order('name');
+  if (!boutiques || !boutiques.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;text-align:center">Tiada butik dijumpai.</p>';
+    return;
+  }
+  el.innerHTML = boutiques.map(function(b){
+    return '<div class="boutique-item" onclick=\'selectBoutique(' + JSON.stringify(b) + ')\'>'
+      + '<span style="font-size:1.1rem">🏪</span>'
+      + '<span class="b-name">' + b.name + '</span>'
+      + '<span class="b-arrow">›</span>'
+      + '</div>';
+  }).join('');
+}
+
+function selectBoutique(boutique) {
+  _user.boutique_id = boutique.id;
+  _user.boutique = { name: boutique.name };
+  localStorage.setItem('receive_user', JSON.stringify(_user));
+  document.getElementById('greet-name').textContent = _user.full_name || _user.username;
+  document.getElementById('greet-boutique').textContent = boutique.name;
+  // Show "Tukar" button for admin
+  if (_user.role === 'admin') document.getElementById('btn-change-boutique').style.display = 'inline-flex';
+  showScreen('screen-home');
+  loadDeliveries();
+}
+
+function changeBoutique() {
+  showScreen('screen-boutique-pick');
+  loadBoutiquePicker();
+}
+
+function doLogout() {
+  _user = null;
+  localStorage.removeItem('receive_user');
+  showScreen('screen-login');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+// ── DELIVERIES ────────────────────────────────────
+var _receiveTab = 'pending';
+var _historyReqs = [];
+
+function switchReceiveTab(tab) {
+  _receiveTab = tab;
+  document.getElementById('rtab-pending').classList.toggle('active', tab === 'pending');
+  document.getElementById('rtab-history').classList.toggle('active', tab === 'history');
+  if (tab === 'pending') {
+    loadDeliveries();
+  } else {
+    renderReceiveHistory();
+  }
+}
+
+async function renderReceiveHistory() {
+  var content = document.getElementById('receive-tab-content');
+  // Build static shell once (so filters don't get wiped on re-render)
+  content.innerHTML =
+    '<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem">'
+    + '<input type="date" id="rhf-date" style="flex:1;min-width:110px;padding:.5rem .65rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyReceiveHistoryFilter()">'
+    + '<input type="text" id="rhf-do" placeholder="🔍 DO No..." style="flex:1;min-width:120px;padding:.5rem .65rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyReceiveHistoryFilter()">'
+    + '<button onclick="document.getElementById(\'rhf-date\').value=\'\';document.getElementById(\'rhf-do\').value=\'\';applyReceiveHistoryFilter()" style="padding:.5rem .75rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.78rem;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div id="rhist-list"><div class="loading-wrap"><div class="spinner"></div></div></div>';
+
+  var boutiqueId = _user && _user.boutique_id;
+  var isAdmin = _user && _user.role === 'admin';
+
+  var q = sb.from('stock_requests')
+    .select('id, do_no, batch_no, request_no, status, updated_at, from_b:from_boutique_id(name), to_b:to_boutique_id(name)')
+    .eq('status', 'Received')
+    .order('updated_at', { ascending: false })
+    .limit(100);
+
+  // Filter by boutique if user has one (regardless of role)
+  if (boutiqueId) {
+    q = q.eq('to_boutique_id', boutiqueId);
+  } else if (!isAdmin) {
+    document.getElementById('rhist-list').innerHTML = '<div class="no-delivery"><div class="icon">⚠️</div><p>Tiada boutique dikaitkan.</p></div>';
+    return;
+  }
+
+  var { data: reqs } = await q;
+
+  // Deduplicate by do_no — keep latest updated_at
+  var doMap = {};
+  (reqs || []).forEach(function(r) {
+    var key = r.do_no || r.id;
+    if (!doMap[key] || r.updated_at > doMap[key].updated_at) doMap[key] = r;
+  });
+  _historyReqs = Object.values(doMap);
+  applyReceiveHistoryFilter();
+}
+
+function applyReceiveHistoryFilter() {
+  var listEl = document.getElementById('rhist-list');
+  if (!listEl) return;
+  var dateVal = (document.getElementById('rhf-date') || {}).value || '';
+  var doVal   = ((document.getElementById('rhf-do') || {}).value || '').trim().toLowerCase();
+
+  var filtered = _historyReqs.filter(function(r) {
+    if (dateVal && !(r.updated_at || '').startsWith(dateVal)) return false;
+    if (doVal && !(r.do_no || '').toLowerCase().includes(doVal)) return false;
+    return true;
+  });
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="no-delivery"><div class="icon">📋</div><p>Tiada rekod dijumpai.</p></div>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(function(r) {
+    var dt = r.updated_at ? new Date(r.updated_at).toLocaleString('ms-MY', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+    var from = r.to_b   ? r.to_b.name   : '—';
+    var to   = r.from_b ? r.from_b.name : '—';
+    return '<div class="hist-card">'
+      + '<div class="hist-do">' + (r.do_no || r.request_no || '—') + '</div>'
+      + '<div class="hist-meta">Dari: ' + from + ' → ' + to + '</div>'
+      + '<div class="hist-meta" style="margin-top:.15rem">' + dt + '</div>'
+      + '<span class="hist-badge">✅ Diterima</span>'
+      + '</div>';
+  }).join('');
+}
+
+// ── DELIVERIES ────────────────────────────────────
+async function loadDeliveries() {
+  var el = document.getElementById('receive-tab-content');
+  el.innerHTML = '<div class="loading-wrap"><div class="spinner"></div></div>';
+  if (!_user || !_user.boutique_id) {
+    el.innerHTML = '<div class="no-delivery"><div class="icon">⚠️</div><p>Tiada boutique dikaitkan dengan akaun ini.</p></div>';
+    return;
+  }
+
+  var boutiqueId   = _user.boutique_id;
+  var boutiqueName = _user.boutique ? _user.boutique.name : null;
+  console.log('[receive] boutiqueId:', boutiqueId, '| boutiqueName:', boutiqueName);
+
+  // ── 1a. stock_requests by from_boutique_id (In Transit / Arrived)
+  var { data: reqsFrom, error: errFrom } = await sb.from('stock_requests')
+    .select('id, do_no, batch_no, request_no, status, src:to_boutique_id(name)')
+    .eq('from_boutique_id', boutiqueId)
+    .in('status', ['In Transit', 'Arrived']);
+  console.log('[receive] stock_requests(from_boutique_id):', reqsFrom, errFrom);
+
+  // ── 1b. Also try to_boutique_id in case column roles are reversed
+  var { data: reqsTo, error: errTo } = await sb.from('stock_requests')
+    .select('id, do_no, batch_no, request_no, status, src:from_boutique_id(name)')
+    .eq('to_boutique_id', boutiqueId)
+    .in('status', ['In Transit', 'Arrived']);
+  console.log('[receive] stock_requests(to_boutique_id):', reqsTo, errTo);
+
+  // Merge both result sets (deduplicate by id)
+  var seenIds = new Set();
+  var allReqs = [];
+  [(reqsFrom || []), (reqsTo || [])].forEach(function(arr) {
+    arr.forEach(function(r) { if (!seenIds.has(r.id)) { seenIds.add(r.id); allReqs.push(r); } });
+  });
+
+  // Group stock_request results by DO / batch
+  var groups = {};
+  allReqs.forEach(function(r) {
+    var key = r.do_no || r.batch_no || r.request_no;
+    if (!key) return;
+    if (!groups[key]) groups[key] = { doNo: r.do_no, batchNo: r.batch_no || r.request_no, fromName: r.src ? r.src.name : '—', ids: [], tripId: null };
+    groups[key].ids.push(r.id);
+  });
+
+  // ── 2. Fallback: fleet_trips with status 'Arrived' destined here, no POD yet
+  //    Query all Arrived trips then filter by destination name (case-insensitive) in JS
+  var { data: trips, error: errTrips } = await sb.from('fleet_trips')
+    .select('id, do_no, destination, status, pod_confirmed_at, driver:fleet_drivers(name), vehicle:fleet_vehicles(plate_no)')
+    .eq('status', 'Arrived')
+    .is('pod_confirmed_at', null);
+  console.log('[receive] fleet_trips(Arrived):', trips, errTrips);
+
+  var nameLower = boutiqueName ? boutiqueName.trim().toLowerCase() : null;
+  (trips || []).forEach(function(trip) {
+    var destLower = trip.destination ? trip.destination.trim().toLowerCase() : '';
+    if (!nameLower || destLower !== nameLower) return;  // not for this boutique
+    var driverName = trip.driver ? trip.driver.name : null;
+    var platNo = trip.vehicle ? trip.vehicle.plate_no : null;
+    var key = trip.do_no || ('trip-' + trip.id);
+    if (groups[key]) {
+      groups[key].tripId = trip.id;
+      groups[key].driverName = driverName;
+      groups[key].platNo = platNo;
+      groups[key].isArrived = true;
+    } else {
+      groups[key] = {
+        doNo: trip.do_no || null,
+        batchNo: null,
+        fromName: '—',               // don't use driver name as source label
+        ids: [],
+        tripId: trip.id,
+        driverName: driverName,
+        platNo: platNo,
+        isArrived: true
+      };
+    }
+  });
+
+  if (!Object.keys(groups).length) {
+    el.innerHTML = '<div class="no-delivery"><div class="icon">🎉</div><p>Tiada penghantaran menunggu penerimaan.</p><button class="refresh-btn" onclick="loadDeliveries()">🔄 Muat Semula</button></div>';
+    return;
+  }
+
+  // ── 3. Get carton counts — count rows (1 row = 1 carton), no status filter
+  var allDOs     = Object.values(groups).map(function(g){ return g.doNo; }).filter(Boolean);
+  var allBatches = Object.values(groups).map(function(g){ return !g.doNo && g.batchNo ? g.batchNo : null; }).filter(Boolean);
+  var cartonMap  = {};   // do_no / batch_no → count
+
+  if (allDOs.length || allBatches.length) {
+    // Count cartons by do_no
+    if (allDOs.length) {
+      var { data: cartons } = await sb.from('cartons').select('do_no, batch_no, sto_no').in('do_no', allDOs);
+      console.log('[receive] cartons by do_no:', cartons);
+      (cartons || []).forEach(function(c){
+        if (c.do_no) cartonMap[c.do_no] = (cartonMap[c.do_no] || 0) + 1;
+      });
+    }
+    // Count cartons by batch_no
+    if (allBatches.length) {
+      var { data: cartonsB } = await sb.from('cartons').select('batch_no').in('batch_no', allBatches);
+      (cartonsB || []).forEach(function(c){
+        if (c.batch_no) cartonMap[c.batch_no] = (cartonMap[c.batch_no] || 0) + 1;
+      });
+    }
+    // Fallback: carton_scans if nothing found in cartons table
+    var missingDOs = allDOs.filter(function(dn){ return !cartonMap[dn]; });
+    if (missingDOs.length) {
+      var tripIds = Object.values(groups)
+        .filter(function(g){ return missingDOs.indexOf(g.doNo) !== -1 && g.tripId; })
+        .map(function(g){ return g.tripId; });
+      if (tripIds.length) {
+        var { data: scans } = await sb.from('carton_scans').select('trip_id').in('trip_id', tripIds);
+        console.log('[receive] carton_scans fallback:', scans);
+        var tripToDoMap = {};
+        Object.values(groups).forEach(function(g){ if (g.tripId && g.doNo) tripToDoMap[g.tripId] = g.doNo; });
+        (scans || []).forEach(function(s){
+          var dn = tripToDoMap[s.trip_id];
+          if (dn) cartonMap[dn] = (cartonMap[dn] || 0) + 1;
+        });
+      }
+    }
+  }
+
+  // ── 4. Render
+  var html = '';
+  var destName = boutiqueName || '—';
+  Object.keys(groups).forEach(function(key) {
+    var g = groups[key];
+    var count = cartonMap[g.doNo] || cartonMap[g.batchNo] || 0;
+    var payload = { doNo: g.doNo, batchNo: g.batchNo, fromName: g.fromName, ids: g.ids, expectedCartons: count, tripId: g.tripId || null };
+    var isArrived = !!g.isArrived;
+    var sourceLabel = g.fromName && g.fromName !== '—' ? g.fromName : null;
+    // meta line: driver · plat · items
+    var metaParts = [];
+    if (g.driverName) metaParts.push('Pemandu: ' + g.driverName);
+    if (g.platNo)     metaParts.push('🚗 ' + g.platNo);
+    if (g.ids.length) metaParts.push(g.ids.length + ' item');
+    html += '<div class="delivery-card">'
+      // Status badge
+      + '<div class="dc-status ' + (isArrived ? 'arrived' : 'transit') + '">'
+        + (isArrived ? '📍 Driver Tiba' : '🚚 Dalam Perjalanan')
+      + '</div>'
+      // DO number
+      + '<div class="dc-do">' + (g.doNo || g.batchNo || 'Trip #' + (g.tripId || '—')) + '</div>'
+      // Route: source → destination (only if source is meaningful)
+      + (sourceLabel
+          ? '<div class="dc-route"><div class="dc-route-from">' + sourceLabel + '</div><div class="dc-route-arrow">→</div><div class="dc-route-to">' + destName + '</div></div>'
+          : '<div class="dc-route"><div class="dc-route-to" style="text-align:left">→ ' + destName + '</div></div>')
+      // Driver, plate & items
+      + (metaParts.length ? '<div class="dc-meta">' + metaParts.join(' · ') + '</div>' : '')
+      // Carton badge
+      + (count > 0
+          ? '<div class="dc-carton has">📦 ' + count + ' karton dijangka</div>'
+          : '<div class="dc-carton none">📦 Tiada karton didaftarkan</div>')
+      + '<button class="btn-receive" onclick=\'startReceive(' + JSON.stringify(payload) + ')\'>📥 Mula Terima</button>'
+      + '</div>';
+  });
+  html += '<button class="refresh-btn" style="width:100%;max-width:420px;margin-top:.25rem" onclick="loadDeliveries()">🔄 Muat Semula</button>';
+  el.innerHTML = html;
+}
+
+// ── START RECEIVING ───────────────────────────────
+async function startReceive(delivery) {
+  _currentDelivery = delivery;
+  _scans = [];
+
+  // Fetch cartons for this delivery — no status filter (may have been scanned already by driver)
+  console.log('[startReceive] delivery:', delivery);
+  var cartonData = null, cartonErr = null;
+  if (delivery.doNo) {
+    var res = await sb.from('cartons').select('id, barcode, carton_no, total_cartons, do_no, batch_no').eq('do_no', delivery.doNo);
+    cartonData = res.data; cartonErr = res.error;
+  } else if (delivery.batchNo) {
+    var res = await sb.from('cartons').select('id, barcode, carton_no, total_cartons, do_no, batch_no').eq('batch_no', delivery.batchNo);
+    cartonData = res.data; cartonErr = res.error;
+  }
+  console.log('[startReceive] carton query result:', cartonData, cartonErr);
+  _allCartons = cartonData || [];
+
+  // Fallback: load from carton_scans if cartons table has no rows for this DO
+  if (!_allCartons.length && delivery.tripId) {
+    var { data: scans } = await sb.from('carton_scans')
+      .select('barcode, trip_id').eq('trip_id', delivery.tripId);
+    console.log('[startReceive] carton_scans fallback:', scans);
+    _allCartons = (scans || []).map(function(s, i) {
+      return { id: null, barcode: s.barcode, carton_no: i + 1, total_cartons: (scans || []).length, do_no: delivery.doNo, batch_no: delivery.batchNo };
+    });
+  }
+
+  var label = delivery.doNo || delivery.batchNo || '—';
+  document.getElementById('scan-do-label').textContent = label;
+  document.getElementById('scan-count').textContent = '0';
+  document.getElementById('scan-total').textContent = _allCartons.length || delivery.expectedCartons || '?';
+  document.getElementById('scan-status-msg').textContent = '';
+  document.getElementById('confirm-btn').classList.remove('ready');
+  document.getElementById('manual-input').value = '';
+
+  showScreen('screen-scan');
+  renderReceiveScanList();
+  startScanner();
+  setTimeout(function(){ document.getElementById('manual-input').focus(); }, 800);
+}
+
+// ── CARTON CHECKLIST ──────────────────────────────
+function renderReceiveScanList() {
+  var feed = document.getElementById('scan-feed');
+  feed.innerHTML = '';
+  var scannedBarcodes = _scans.map(function(s){ return s.barcode; });
+
+  if (_allCartons.length) {
+    // Main header
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'padding:.5rem 1rem 0;font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em';
+    hdr.textContent = 'Senarai Karton (' + _allCartons.length + ')';
+    feed.appendChild(hdr);
+
+    // Group cartons by STO (extracted from barcode: C1|STO-NO|...)
+    var stoGroups = {}, stoOrder = [];
+    _allCartons.forEach(function(c) {
+      var parts = c.barcode ? c.barcode.split('|') : [];
+      var stoKey = parts.length >= 2 ? parts[1] : (c.sto_no || 'Unknown');
+      if (!stoGroups[stoKey]) { stoGroups[stoKey] = []; stoOrder.push(stoKey); }
+      stoGroups[stoKey].push(c);
+    });
+
+    stoOrder.forEach(function(stoKey) {
+      var group = stoGroups[stoKey];
+      var scannedCount = group.filter(function(c){ return scannedBarcodes.includes(c.barcode); }).length;
+      var complete = scannedCount === group.length;
+      var stoColor = complete ? 'var(--green)' : 'var(--red,#ef4444)';
+
+      // STO header row
+      var stoHdr = document.createElement('div');
+      stoHdr.setAttribute('data-sto-key', stoKey);
+      stoHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.45rem 1rem;margin-top:.5rem;background:' + (complete ? '#10b98118' : '#ef444418') + ';border-left:3px solid ' + stoColor + ';border-radius:0 6px 6px 0';
+      stoHdr.innerHTML = '<span style="font-size:.75rem;font-weight:800;color:' + stoColor + ';font-family:monospace">' + stoKey + '</span>'
+        + '<span style="font-size:.7rem;font-weight:700;color:' + stoColor + '">' + scannedCount + ' / ' + group.length + '</span>';
+      feed.appendChild(stoHdr);
+
+      group.forEach(function(c, stoIdx) {
+        var isScanned = scannedBarcodes.includes(c.barcode);
+        var scanEntry = isScanned ? _scans.find(function(s){ return s.barcode === c.barcode; }) : null;
+        var timeStr = scanEntry ? fmtTime(scanEntry.time) : '';
+
+        var item = document.createElement('div');
+        item.className = 'scan-item' + (isScanned ? ' ok' : '');
+        item.id = 'carton-row-' + c.barcode.replace(/[^a-z0-9]/gi, '_');
+        item.style.cssText = isScanned ? 'background:#10b98115;border-color:var(--green);transition:background .25s,border-color .25s' : 'transition:background .25s,border-color .25s';
+        item.innerHTML =
+          '<div style="flex:1;min-width:0">'
+          + '<div class="scan-barcode" style="' + (isScanned ? 'color:var(--green)' : '') + '">' + (function(b, idx, total) {
+              var p = b ? b.split('|') : []; if (p.length >= 3) p[2] = (idx+1)+'/'+total; return p.join('|') || b;
+            })(c.barcode, stoIdx, group.length) + '</div>'
+          + '<div class="scan-note">Karton ' + (stoIdx + 1) + ' / ' + group.length
+            + (timeStr ? ' &nbsp;·&nbsp; ' + timeStr : '') + '</div>'
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">'
+          + (isScanned
+              ? '<span style="color:var(--green);font-size:1.2rem;font-weight:700">✓</span>'
+              : '<span style="color:var(--border);font-size:1.1rem">○</span>')
+          + '</div>';
+        feed.appendChild(item);
+      });
+    });
+
+  } else {
+    var ph = document.createElement('div');
+    ph.style.cssText = 'text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.8rem';
+    ph.textContent = 'Tiada carton didaftarkan. Imbas barcode untuk mula.';
+    feed.appendChild(ph);
+  }
+}
+
+function closeScan() {
+  stopScanner();
+  showScreen('screen-home');
+  loadDeliveries();
+}
+
+// ── CAMERA SCANNER ────────────────────────────────
+function startScanner() {
+  stopScanner();
+  var config = { fps: 10, qrbox: { width: 220, height: 150 }, aspectRatio: 1.7, rememberLastUsedCamera: true };
+  _scanner = new Html5Qrcode('reader');
+  _scanner.start({ facingMode: 'environment' }, config, function(decoded) {
+    processBarcode(decoded);
+  }, function(){}).catch(function(err){ console.warn('Camera:', err); });
+}
+
+function stopScanner() {
+  if (_scanner) {
+    _scanner.stop().catch(function(){});
+    _scanner = null;
+  }
+}
+
+// ── MANUAL INPUT ──────────────────────────────────
+function addManualScan() {
+  var inp = document.getElementById('manual-input');
+  var val = inp.value.trim();
+  if (!val) return;
+  processBarcode(val);
+  inp.value = '';
+  inp.focus();
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  var inp = document.getElementById('manual-input');
+  inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') addManualScan(); });
+
+  // Auto-login if session saved
+  var saved = localStorage.getItem('receive_user');
+  if (saved) {
+    try {
+      _user = JSON.parse(saved);
+      if (!_user.boutique_id) {
+        // Admin with no boutique selected yet
+        showScreen('screen-boutique-pick');
+        loadBoutiquePicker();
+      } else {
+        document.getElementById('greet-name').textContent = _user.full_name || _user.username;
+        document.getElementById('greet-boutique').textContent = _user.boutique ? _user.boutique.name : '—';
+        if (_user.role === 'admin') document.getElementById('btn-change-boutique').style.display = 'inline-flex';
+        showScreen('screen-home');
+        loadDeliveries();
+      }
+    } catch(e){ localStorage.removeItem('receive_user'); }
+  }
+});
+
+// ── UPDATE STO HEADER COLORS AFTER EACH SCAN ─────
+function updateStoHeaders() {
+  var scannedBarcodes = _scans.map(function(s){ return s.barcode; });
+  // Build stoKey → { total, scanned } from _allCartons
+  var stoGroups = {};
+  _allCartons.forEach(function(c) {
+    var parts = c.barcode ? c.barcode.split('|') : [];
+    var stoKey = parts.length >= 2 ? parts[1] : (c.sto_no || 'Unknown');
+    if (!stoGroups[stoKey]) stoGroups[stoKey] = { total: 0, scanned: 0 };
+    stoGroups[stoKey].total++;
+    if (scannedBarcodes.includes(c.barcode)) stoGroups[stoKey].scanned++;
+  });
+  document.querySelectorAll('[data-sto-key]').forEach(function(hdr) {
+    var key = hdr.getAttribute('data-sto-key');
+    var g = stoGroups[key];
+    if (!g) return;
+    var complete = g.total > 0 && g.scanned === g.total;
+    var color = complete ? 'var(--green)' : '#ef4444';
+    hdr.style.background = complete ? '#10b98118' : '#ef444418';
+    hdr.style.borderLeftColor = color;
+    var spans = hdr.querySelectorAll('span');
+    if (spans[0]) spans[0].style.color = color;
+    if (spans[1]) { spans[1].textContent = g.scanned + ' / ' + g.total; spans[1].style.color = color; }
+  });
+}
+
+// ── PROCESS BARCODE ───────────────────────────────
+async function processBarcode(barcode) {
+  if (!barcode || !_currentDelivery) return;
+  var beep = document.getElementById('beep-dot');
+
+  // Flash
+  beep.className = 'beep-dot';
+  void beep.offsetWidth;
+
+  // Duplicate check
+  var isDup = _scans.some(function(s){ return s.barcode === barcode; });
+  if (isDup) {
+    beep.classList.add('dup');
+    addScanItem(barcode, 'dup', 'Sudah diimbas sebelum ini');
+    showToast('⚠️ Karton sudah diimbas!');
+    return;
+  }
+
+  // Validate against registered cartons — exact match first
+  var matched = _allCartons.find(function(c){ return c.barcode === barcode; });
+
+  // Fuzzy fallback in _allCartons: match on C{n}|{STO}| prefix, ignore x/y segment
+  if (!matched && barcode.includes('|')) {
+    var scanParts = barcode.split('|');
+    if (scanParts.length >= 2) {
+      var bPrefix = scanParts[0] + '|' + scanParts[1] + '|';
+      matched = _allCartons.find(function(c){ return c.barcode && c.barcode.startsWith(bPrefix); });
+    }
+  }
+
+  if (!matched) {
+    // Try exact lookup in DB in case cartons were registered after page load
+    var { data: found } = await sb.from('cartons')
+      .select('id, barcode, carton_no, total_cartons, do_no, batch_no')
+      .eq('barcode', barcode).eq('status','registered').limit(1);
+    if (found && found.length) matched = found[0];
+  }
+
+  // Fuzzy DB fallback: match on prefix
+  if (!matched && barcode.includes('|')) {
+    var scanParts2 = barcode.split('|');
+    if (scanParts2.length >= 2) {
+      var bPrefix2 = scanParts2[0] + '|' + scanParts2[1] + '|';
+      var { data: fuzzyDb } = await sb.from('cartons')
+        .select('id, barcode, carton_no, total_cartons, do_no, batch_no')
+        .like('barcode', bPrefix2 + '%').eq('status','registered').limit(1);
+      if (fuzzyDb && fuzzyDb.length) matched = fuzzyDb[0];
+    }
+  }
+
+  // Normalise barcode to DB value so scan feed & checklist match
+  if (matched && matched.barcode && matched.barcode !== barcode) barcode = matched.barcode;
+
+  // Re-check duplicate after normalisation (label 1/2 and label 3/4 same carton)
+  if (matched && _scans.some(function(s){ return s.barcode === barcode; })) {
+    beep.classList.add('dup');
+    addScanItem(barcode, 'dup', 'Sudah diimbas sebelum ini');
+    showToast('⚠️ Karton sudah diimbas!');
+    return;
+  }
+
+  if (!matched) {
+    beep.classList.add('error');
+    addScanItem(barcode, 'err', '❌ Karton tidak dikenali atau bukan untuk penghantaran ini');
+    showToast('❌ Karton tidak sah!');
+    return;
+  }
+
+  // Valid carton
+  beep.classList.add('success');
+  _scans.push({ barcode: barcode, carton_no: matched.carton_no, total: matched.total_cartons, time: new Date() });
+  showToast('✅ Karton ' + (matched.carton_no || barcode) + ' disahkan');
+
+  // Re-render checklist (updates STO headers + row colors in one pass)
+  renderReceiveScanList();
+  // Scroll the just-scanned row into view
+  var rowId = 'carton-row-' + barcode.replace(/[^a-z0-9]/gi, '_');
+  var row = document.getElementById(rowId);
+  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Update counter
+  var total = _allCartons.length || _currentDelivery.expectedCartons || '?';
+  document.getElementById('scan-count').textContent = _scans.length;
+  document.getElementById('scan-total').textContent = total;
+
+  // Check if all done
+  var expectedCount = _allCartons.length || _currentDelivery.expectedCartons || 0;
+  if (expectedCount > 0 && _scans.length >= expectedCount) {
+    document.getElementById('scan-status-msg').textContent = '🎉 Semua karton disahkan!';
+    document.getElementById('confirm-btn').classList.add('ready');
+    showToast('🎉 Semua karton diterima! Tekan Sahkan.');
+  } else {
+    var remaining = expectedCount > 0 ? (expectedCount - _scans.length) : '?';
+    document.getElementById('scan-status-msg').textContent = remaining + ' karton lagi';
+  }
+}
+
+function addScanItem(barcode, type, note) {
+  var feed = document.getElementById('scan-feed');
+  var item = document.createElement('div');
+  item.className = 'scan-item ' + (type === 'ok' ? 'ok' : type === 'dup' ? '' : 'err');
+  var icon = type === 'ok' ? '✅' : type === 'dup' ? '⚠️' : '❌';
+  var time = fmtTime(new Date());
+  item.innerHTML = '<div class="scan-icon">' + icon + '</div>'
+    + '<div class="scan-info"><div class="scan-barcode">' + barcode + '</div><div class="scan-note">' + note + '</div></div>'
+    + '<div class="scan-time">' + time + '</div>';
+  feed.insertBefore(item, feed.firstChild);
+}
+
+// ── SIGNATURE PAD ─────────────────────────────────
+let _sigDrawing = false;
+let _sigHasSig = false;
+
+function openSignatureModal() {
+  if (!_scans.length || !_currentDelivery) return;
+  document.getElementById('sig-modal').style.display = 'flex';
+  document.getElementById('sig-name').value = '';
+  // Init canvas after it's visible
+  setTimeout(function() {
+    var canvas = document.getElementById('sig-canvas');
+    canvas.width = canvas.offsetWidth;
+    _sigHasSig = false;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Mouse events
+    canvas.onmousedown = function(e){ _sigDrawing = true; var p = getSigPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+    canvas.onmousemove = function(e){ if (!_sigDrawing) return; drawSig(ctx, e); };
+    canvas.onmouseup = function(){ _sigDrawing = false; };
+    canvas.onmouseleave = function(){ _sigDrawing = false; };
+    // Touch events
+    canvas.ontouchstart = function(e){ e.preventDefault(); _sigDrawing = true; var p = getSigPos(e.touches[0]); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+    canvas.ontouchmove = function(e){ e.preventDefault(); if (!_sigDrawing) return; drawSig(ctx, e.touches[0]); };
+    canvas.ontouchend = function(){ _sigDrawing = false; };
+  }, 50);
+}
+
+function getSigPos(e) {
+  var canvas = document.getElementById('sig-canvas');
+  var rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+function drawSig(ctx, e) {
+  var p = getSigPos(e);
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  _sigHasSig = true;
+}
+
+function clearSig() {
+  var canvas = document.getElementById('sig-canvas');
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  _sigHasSig = false;
+}
+
+function closeSignatureModal() {
+  document.getElementById('sig-modal').style.display = 'none';
+}
+
+async function submitSignature() {
+  var name = document.getElementById('sig-name').value.trim();
+  if (!name) { showToast('⚠️ Sila masukkan nama penerima', 2000); return; }
+  if (!_sigHasSig) { showToast('⚠️ Sila tandatangan dahulu', 2000); return; }
+  var canvas = document.getElementById('sig-canvas');
+  var sigBase64 = canvas.toDataURL('image/png');
+  closeSignatureModal();
+  await confirmReceive(name, sigBase64);
+}
+
+// ── CONFIRM RECEIVE ───────────────────────────────
+async function confirmReceive(receiverName, signatureImage) {
+  if (!_scans.length || !_currentDelivery) return;
+  var btn = document.getElementById('confirm-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Memproses...';
+
+  var who = _user ? (_user.full_name || _user.username) : 'Staff';
+  var ids  = _currentDelivery.ids || [];
+  var doNo = _currentDelivery.doNo || '—';
+
+  try {
+    // 1. Update stock_requests to Received
+    var reqIds = ids.slice();
+    // If no ids from home screen, look up by DO no
+    if (!reqIds.length && doNo && doNo !== '—') {
+      var { data: foundReqs } = await sb.from('stock_requests').select('id').eq('do_no', doNo);
+      reqIds = (foundReqs || []).map(function(r){ return r.id; });
+    }
+    if (reqIds.length) {
+      await sb.from('stock_requests').update({ status: 'Received' }).in('id', reqIds);
+      // Fetch batch_no per req so we can count cartons per REQ, not DO total
+      var { data: reqDetails } = await sb.from('stock_requests').select('id, batch_no, request_no').in('id', reqIds);
+      var scannedBarcodeSet = _scans.map(function(s){ return s.barcode; });
+      await Promise.all(reqIds.map(function(id){
+        var req = reqDetails && reqDetails.find(function(r){ return r.id === id; });
+        var batchNo = req ? (req.batch_no || req.request_no) : null;
+        var reqCount = _scans.length; // fallback: total
+        if (batchNo) {
+          var reqBarcodes = _allCartons.filter(function(c){ return c.batch_no === batchNo; }).map(function(c){ return c.barcode; });
+          reqCount = _scans.filter(function(s){ return reqBarcodes.includes(s.barcode); }).length;
+        }
+        var note = 'Karton diterima | ' + reqCount + ' karton diimbas | DO: ' + doNo + ' | Diterima oleh: ' + (receiverName || who);
+        return sb.from('request_status_log').insert({ request_id: id, status: 'Received', note: note, changed_by: who });
+      }));
+    }
+
+    // 2. Update cartons status to 'delivered'
+    var scannedBarcodes = _scans.map(function(s){ return s.barcode; });
+    if (scannedBarcodes.length) {
+      await sb.from('cartons').update({ status: 'delivered' }).in('barcode', scannedBarcodes);
+    }
+
+    // 3. Update fleet_trip: set POD confirmed + receiver name + signature
+    var podUpdate = {
+      status: 'Arrived',
+      pod_confirmed_at: new Date().toISOString(),
+      pod_confirmed_by: who,
+      receiver_name: receiverName || null,
+      signature_image: signatureImage || null
+    };
+    if (_currentDelivery.tripId) {
+      // Direct match by trip ID (most reliable)
+      await sb.from('fleet_trips').update(podUpdate).eq('id', _currentDelivery.tripId);
+    } else if (_currentDelivery.doNo) {
+      // Fallback: match by DO no
+      await sb.from('fleet_trips').update(podUpdate).eq('do_no', _currentDelivery.doNo);
+    }
+
+    showToast('✅ Penerimaan berjaya disahkan!', 3000);
+    setTimeout(function(){
+      stopScanner();
+      showScreen('screen-home');
+      loadDeliveries();
+    }, 1500);
+
+  } catch(err) {
+    console.error(err);
+    showToast('❌ Ralat! Cuba lagi.', 3000);
+    btn.disabled = false;
+    btn.textContent = '✅ Sahkan Penerimaan';
+    btn.classList.add('ready');
+  }
+}
+
+// ── PWA: Service Worker + Install Prompt ─────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(function(){});
+}
+var _pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  _pwaPrompt = e;
+  var btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = 'block';
+});
+function installPWA() {
+  if (!_pwaPrompt) return;
+  _pwaPrompt.prompt();
+  _pwaPrompt.userChoice.then(function(){ _pwaPrompt = null; document.getElementById('pwa-install-btn').style.display = 'none'; });
+}
+</script>
+<div id="pwa-install-btn" style="display:none;position:fixed;bottom:1.5rem;right:1rem;z-index:9999">
+  <button onclick="installPWA()" style="padding:.6rem 1.1rem;background:#10b981;color:#fff;border:none;border-radius:20px;font-size:.82rem;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,.4)">📲 Install App</button>
+</div>
+</body>
+</html>

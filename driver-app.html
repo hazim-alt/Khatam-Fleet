@@ -1,0 +1,2021 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0f172a"/>
+<link rel="manifest" href="driver-manifest.json"/>
+<link rel="apple-touch-icon" href="icon-driver-192.png"/>
+<title>Fleet Driver</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0f172a;--card:#1e293b;--border:#334155;--text:#f1f5f9;--muted:#94a3b8;
+  --accent:#6366f1;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;--blue:#3b82f6;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* LANG BAR */
+#lang-bar{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;justify-content:flex-end;padding:.5rem .75rem;background:var(--bg);border-bottom:1px solid var(--border)}
+.lang-btn{padding:.25rem .6rem;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.72rem;cursor:pointer;font-weight:600}
+.lang-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* SCREENS */
+.screen{display:none;padding:4rem 1rem 2rem;min-height:100vh;flex-direction:column;align-items:center}
+.screen.active{display:flex}
+#screen-login.active{justify-content:center}
+#screen-home.active{justify-content:flex-start;padding-top:4.5rem}
+#screen-scan.active{justify-content:flex-start;padding-top:4.5rem;padding-left:0;padding-right:0}
+
+/* LOGIN */
+.login-logo{font-size:3rem;margin-bottom:.5rem;text-align:center}
+.login-title{font-size:1.3rem;font-weight:800;margin-bottom:.25rem;text-align:center}
+.login-sub{font-size:.8rem;color:var(--muted);margin-bottom:2rem;text-align:center}
+.login-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:380px}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.75rem;font-weight:600;color:var(--muted);margin-bottom:.4rem}
+.field input{width:100%;padding:.75rem 1rem;background:#0f172a;border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;outline:none}
+.field input:focus{border-color:var(--accent)}
+.err-msg{color:var(--red);font-size:.75rem;margin-bottom:.75rem;display:none;text-align:center}
+.btn-full{width:100%;padding:.85rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer}
+.btn-full:disabled{opacity:.5}
+
+/* HOME */
+.driver-header{width:100%;max-width:420px;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.driver-greet{font-size:.95rem;font-weight:700}
+.driver-sub{font-size:.72rem;color:var(--muted)}
+.logout-btn{background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.72rem;padding:.3rem .65rem;cursor:pointer}
+.trip-tab{flex:1;padding:.6rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:.82rem;font-weight:700;cursor:pointer;transition:all .15s}
+.trip-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.trip-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.25rem;width:100%;max-width:420px;margin-bottom:1rem}
+.trip-badge{display:inline-block;padding:.25rem .75rem;border-radius:20px;font-size:.7rem;font-weight:700;margin-bottom:.75rem}
+.badge-assigned{background:#6366f120;color:var(--accent);border:1px solid var(--accent)}
+.badge-departed{background:#f59e0b20;color:var(--yellow);border:1px solid var(--yellow)}
+.badge-scanning{background:#3b82f620;color:var(--blue);border:1px solid var(--blue)}
+.trip-do{font-size:1rem;font-weight:800;font-family:monospace;color:var(--accent);margin-bottom:.25rem}
+.trip-dest{font-size:.9rem;font-weight:600;margin-bottom:.1rem}
+.trip-vehicle{font-size:.75rem;color:var(--muted);margin-bottom:.75rem}
+.action-btn{width:100%;max-width:420px;padding:.85rem;border:none;border-radius:12px;font-size:.95rem;font-weight:700;cursor:pointer;margin-top:.25rem}
+.btn-scan{background:var(--blue);color:#fff}
+.btn-start{background:var(--accent);color:#fff}
+.btn-arrived{background:var(--green);color:#fff}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.8rem;padding:.65rem;border-radius:10px;cursor:pointer;width:100%;max-width:420px;margin-top:.4rem}
+
+/* MAP */
+#trip-map-wrap{width:100%;max-width:420px;border-radius:14px;overflow:hidden;border:1px solid var(--border);margin-bottom:1rem}
+#trip-map{height:200px;width:100%}
+.map-label{background:var(--card);padding:.5rem .75rem;font-size:.72rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
+.gps-on{color:var(--green)} .gps-off{color:var(--red)}
+
+/* NO TRIP */
+.no-trip{text-align:center;padding:2rem;color:var(--muted);width:100%;max-width:420px}
+.no-trip .icon{font-size:3rem;margin-bottom:.75rem;opacity:.3}
+
+/* HISTORY */
+.history-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem;width:100%;max-width:420px;margin-bottom:.75rem}
+.history-do{font-size:.85rem;font-weight:700;font-family:monospace;color:var(--muted)}
+.history-dest{font-size:.8rem;color:var(--text)}
+.history-time{font-size:.7rem;color:var(--muted);margin-top:.25rem}
+
+/* ── SCAN SCREEN ── */
+#scan-header{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;border-bottom:1px solid var(--border);width:100%;background:var(--card)}
+.back-btn{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:.2rem .5rem;line-height:1}
+#scan-title{font-weight:700;font-size:.9rem}
+#scan-do{font-size:.72rem;color:var(--muted);font-family:monospace}
+
+#camera-section{width:100%;background:#000;position:relative}
+#reader{width:100%;max-height:260px;overflow:hidden}
+#reader video{width:100%!important;max-height:260px;object-fit:cover}
+/* hide html5-qrcode default UI clutter */
+#reader__dashboard_section_swaplink{display:none!important}
+#reader__status_span{font-size:.7rem!important;color:var(--muted)!important}
+.scan-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:140px;border:2px solid var(--accent);border-radius:10px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
+.scan-line{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanline 1.8s ease-in-out infinite}
+@keyframes scanline{0%,100%{top:0}50%{top:calc(100% - 2px)}}
+
+#manual-section{padding:.75rem 1rem;border-top:1px solid var(--border);background:var(--card);width:100%}
+.manual-label{font-size:.72rem;color:var(--muted);margin-bottom:.4rem}
+.scan-input-row{display:flex;gap:.5rem}
+#manual-input{flex:1;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none}
+#manual-input:focus{border-color:var(--accent)}
+#manual-btn{padding:.65rem 1rem;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap}
+
+#scan-counter{padding:.65rem 1rem;background:var(--bg);display:flex;align-items:center;justify-content:space-between;width:100%;border-bottom:1px solid var(--border)}
+.counter-num{font-size:1.2rem;font-weight:800;color:var(--accent)}
+.counter-label{font-size:.72rem;color:var(--muted)}
+.beep-indicator{width:10px;height:10px;border-radius:50%;background:var(--border);transition:background .15s}
+.beep-indicator.active{background:var(--green)}
+
+#scan-list{flex:1;overflow-y:auto;width:100%;padding:.5rem 1rem 5rem}
+.scan-item{display:flex;align-items:center;justify-content:space-between;padding:.6rem .75rem;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:.4rem}
+.scan-item.duplicate{border-color:var(--yellow);background:#f59e0b10}
+.scan-barcode{font-family:monospace;font-size:.85rem;font-weight:700}
+.scan-time{font-size:.68rem;color:var(--muted)}
+.scan-check{color:var(--green);font-size:1rem}
+.scan-dup{color:var(--yellow);font-size:.7rem;font-weight:700}
+.delete-scan{background:none;border:none;color:var(--red);cursor:pointer;font-size:.85rem;padding:.1rem .3rem}
+
+#scan-footer{position:fixed;bottom:0;left:0;right:0;padding:.75rem 1rem;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.4rem}
+.btn-depart{padding:.8rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;width:100%}
+.btn-depart:disabled{opacity:.4}
+
+/* DELIVERY LIST */
+.delivery-list{width:100%;max-width:420px}
+.delivery-item{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-bottom:.75rem;position:relative;transition:opacity .2s,transform .2s}
+.delivery-item.dragging{opacity:.4;transform:scale(.97)}
+.delivery-item.drag-over{border-color:var(--accent);background:#6366f115}
+.delivery-item-header{display:flex;align-items:center;gap:.65rem;margin-bottom:.5rem}
+.drag-handle{font-size:1.1rem;color:var(--muted);cursor:grab;padding:.1rem .2rem;touch-action:none;flex-shrink:0}
+.drag-handle:active{cursor:grabbing}
+.seq-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.delivery-do{font-size:.88rem;font-weight:800;font-family:monospace;color:var(--accent);flex:1}
+.delivery-eta{font-size:.7rem;color:var(--yellow);font-weight:700;white-space:nowrap}
+.delivery-dest{font-size:.85rem;font-weight:600;margin-bottom:.2rem}
+.delivery-status{font-size:.72rem;color:var(--muted);margin-bottom:.6rem}
+.delivery-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+.btn-arrived-sm{padding:.5rem .9rem;background:var(--green);border:none;border-radius:8px;color:#fff;font-size:.78rem;font-weight:700;cursor:pointer}
+.btn-waiting{padding:.5rem .9rem;background:#f59e0b20;border:1px solid var(--yellow);border-radius:8px;color:var(--yellow);font-size:.78rem;font-weight:700;cursor:default}
+.btn-pod{padding:.5rem .9rem;background:#10b98120;border:1px solid var(--green);border-radius:8px;color:var(--green);font-size:.78rem;font-weight:700;cursor:pointer}
+
+/* POD SCREEN */
+#screen-pod{background:var(--bg)}
+.pod-header{width:100%;max-width:420px;text-align:center;margin-bottom:1.5rem}
+.pod-icon{font-size:3.5rem;margin-bottom:.5rem}
+.pod-title{font-size:1.2rem;font-weight:800;color:var(--green);margin-bottom:.25rem}
+.pod-sub{font-size:.8rem;color:var(--muted)}
+.pod-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.25rem;width:100%;max-width:420px;margin-bottom:1rem}
+.pod-row{display:flex;justify-content:space-between;align-items:flex-start;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.82rem}
+.pod-row:last-child{border-bottom:none}
+.pod-label{color:var(--muted);font-size:.75rem}
+.pod-value{font-weight:700;text-align:right;font-family:monospace;font-size:.78rem;max-width:65%}
+.pod-carton-list{margin-top:.5rem}
+.pod-carton-item{font-size:.72rem;font-family:monospace;padding:.2rem 0;color:var(--muted);border-bottom:1px solid #334155}
+.pod-carton-item:last-child{border-bottom:none}
+
+/* SPINNER */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:.4rem}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.6)}50%{box-shadow:0 0 0 8px rgba(99,102,241,0)}}
+</style>
+</head>
+<body>
+
+<div id="lang-bar">
+  <button class="lang-btn active" onclick="setLang('ms')" id="btn-ms">BM</button>
+  <button class="lang-btn" onclick="setLang('en')" id="btn-en" style="margin-left:.4rem">EN</button>
+</div>
+
+<!-- SPLASH -->
+<div id="splash" style="position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999">
+  <div style="font-size:3rem;margin-bottom:.75rem">🚐</div>
+  <div style="font-size:.8rem;color:var(--muted)">Loading...</div>
+</div>
+
+<!-- LOGIN -->
+<div class="screen" id="screen-login">
+  <div class="login-logo">🚐</div>
+  <div class="login-title" data-t="loginTitle">Fleet Driver</div>
+  <div class="login-sub" data-t="loginSub">Log masuk untuk mula perjalanan</div>
+  <div class="login-card">
+    <div class="field">
+      <label data-t="username">Nama Pengguna</label>
+      <input type="text" id="inp-user" autocomplete="username" placeholder="Masukkan nama pengguna" data-placeholder-t="userPlaceholder"/>
+    </div>
+    <div class="field">
+      <label data-t="password">Kata Laluan</label>
+      <input type="password" id="inp-pass" autocomplete="current-password" placeholder="Masukkan kata laluan" data-placeholder-t="passPlaceholder"/>
+    </div>
+    <div class="err-msg" id="login-err"></div>
+    <button class="btn-full" id="login-btn" onclick="doLogin()" data-t="loginBtn">Log Masuk</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="screen" id="screen-home">
+  <div class="driver-header">
+    <div>
+      <div class="driver-greet" id="greet-name">Driver</div>
+      <div class="driver-sub" id="greet-vehicle"></div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()" data-t="logout">Log Keluar</button>
+  </div>
+  <!-- TABS -->
+  <div id="trip-tabs" style="display:flex;gap:.4rem;margin-bottom:1rem;width:100%;max-width:420px">
+    <button class="trip-tab active" id="tab-pickup" onclick="switchTripTab('pickup')">🚚 Pick Up</button>
+    <button class="trip-tab" id="tab-delivery" onclick="switchTripTab('delivery')">📦 Delivery</button>
+    <button class="trip-tab" id="tab-history" onclick="switchTripTab('history')">📋 History</button>
+  </div>
+  <div id="trip-map-wrap" style="display:none">
+    <div id="trip-map"></div>
+    <div class="map-label">
+      <span data-t="yourLocation">Lokasi semasa anda</span>
+      <span id="gps-status" class="gps-off" data-t="gpsOff">GPS Tidak Aktif</span>
+    </div>
+  </div>
+  <div id="trip-content" style="width:100%;max-width:420px"></div>
+</div>
+
+<!-- SCAN SCREEN -->
+<div class="screen" id="screen-scan">
+  <div id="scan-header">
+    <button class="back-btn" onclick="closeScan()">‹</button>
+    <div>
+      <div id="scan-title" data-t="scanTitle">Scan Carton Pick Up</div>
+      <div id="scan-do"></div>
+    </div>
+  </div>
+
+  <div id="camera-section">
+    <div id="reader"></div>
+    <div class="scan-overlay"><div class="scan-line"></div></div>
+  </div>
+
+  <div id="scan-counter">
+    <div>
+      <div class="counter-num" id="scan-count">0</div>
+      <div class="counter-label" data-t="cartonScanned">carton discanned</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span style="font-size:.72rem;color:var(--muted)" data-t="scanStatus">Scan atau taip barcode</span>
+      <div class="beep-indicator" id="beep-dot"></div>
+    </div>
+  </div>
+
+  <div id="manual-section">
+    <div class="manual-label" data-t="manualLabel">Scanner luaran / taip manual:</div>
+    <div class="scan-input-row">
+      <input type="text" id="manual-input" placeholder="Barcode..." autocomplete="off" autocorrect="off"/>
+      <button id="manual-btn" onclick="addManualScan()" data-t="add">Tambah</button>
+    </div>
+    <div id="scan-status" style="min-height:1.2rem;font-size:.75rem;margin-top:.4rem;font-weight:700;transition:color .2s"></div>
+  </div>
+
+  <div id="scan-list"></div>
+
+  <div id="scan-footer">
+    <button class="btn-depart" id="depart-btn" onclick="doDepart()" disabled data-t="departBtn">🚀 Selesai &amp; Mula Perjalanan</button>
+    <button class="btn-secondary" onclick="closeScan()" data-t="backBtn">‹ Kembali</button>
+  </div>
+</div>
+
+<!-- POD SCREEN -->
+<div class="screen" id="screen-pod">
+  <div class="pod-header">
+    <div class="pod-icon">✅</div>
+    <div class="pod-title">Delivery Confirmed</div>
+    <div class="pod-sub" id="pod-sub">Proof of delivery has been received.</div>
+  </div>
+  <div class="pod-card" id="pod-details"></div>
+  <div class="pod-card" id="pod-signature-card" style="display:none">
+    <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.06em">Receiver Signature</div>
+    <div id="pod-receiver-name" style="font-size:.82rem;font-weight:600;margin-bottom:.5rem;color:var(--text)"></div>
+    <img id="pod-signature-img" src="" alt="Signature" style="width:100%;border-radius:8px;background:#fff;display:block"/>
+  </div>
+  <div class="pod-card" id="pod-cartons" style="display:none">
+    <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.06em">Cartons Received</div>
+    <div class="pod-carton-list" id="pod-carton-list"></div>
+  </div>
+  <div id="pod-capture-area" style="width:100%;max-width:420px"></div>
+
+  <!-- PHOTO CAPTURE -->
+  <input type="file" id="pod-photo-input" accept="image/*" capture="environment" style="display:none" onchange="onPodPhotoChosen(this)"/>
+  <div id="pod-photo-card" class="pod-card" style="width:100%;max-width:420px">
+    <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.06em">📷 Gambar Bukti</div>
+    <div id="pod-photo-preview" style="display:none;margin-bottom:.6rem">
+      <img id="pod-photo-img" src="" alt="Gambar bukti" style="width:100%;border-radius:8px;display:block;object-fit:cover;max-height:220px"/>
+      <button onclick="clearPodPhoto()" style="margin-top:.4rem;background:none;border:1px solid #ef444480;color:#ef4444;border-radius:6px;padding:.3rem .7rem;font-size:.72rem;cursor:pointer">✕ Buang gambar</button>
+    </div>
+    <button id="pod-photo-btn" class="action-btn btn-secondary" style="max-width:100%;margin-top:0" onclick="document.getElementById('pod-photo-input').click()">📷 Ambil Gambar</button>
+  </div>
+
+  <button id="btn-delivered" class="action-btn" style="max-width:420px;margin-top:.5rem;background:#10b981" onclick="confirmDelivered()">✅ Delivered</button>
+  <button class="action-btn btn-secondary" style="max-width:420px;margin-top:.5rem" onclick="closePOD()">← Back</button>
+</div>
+
+<script>
+// ── CONFIG ─────────────────────────────────────
+const SUPA_URL = 'https://lrathqgqspkiiwumsoar.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyYXRocWdxc3BraWl3dW1zb2FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTk4OTIsImV4cCI6MjA5NjQ5NTg5Mn0.UIu3uMD5SXZ4WyzCuKt27iJvEvL4FO2a-Tg9-cHbaNg';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+const WAREHOUSE = { lat: 3.0496093, lng: 101.541969, name: 'Hap Seng Business Park' };
+
+// ── TRANSLATIONS ────────────────────────────────
+const T = {
+  ms:{
+    loginTitle:'Fleet Driver',loginSub:'Log masuk untuk mula perjalanan',
+    username:'Nama Pengguna',password:'Kata Laluan',
+    userPlaceholder:'Masukkan nama pengguna',passPlaceholder:'Masukkan kata laluan',
+    loginBtn:'Log Masuk',loginErr:'Nama pengguna atau kata laluan salah.',loginLoading:'Sedang log masuk...',
+    logout:'Log Keluar',yourLocation:'Lokasi semasa anda',gpsOn:'GPS Aktif ✓',gpsOff:'GPS Tidak Aktif',
+    noTrip:'Tiada perjalanan aktif',noTripSub:'Tiada trip yang ditugaskan kepada anda buat masa ini.',
+    tripAssigned:'Trip Ditugaskan',tripInTransit:'Dalam Perjalanan',tripArrived:'Selesai',
+    startScan:'📦 Mula Scan Carton Pick Up',startTrip:'🚀 Mula Perjalanan (tanpa scan)',
+    arrived:'✅ Sudah Sampai',confirmArrive:'Confirm dah sampai destinasi?',arriving:'Merekod ketibaan...',
+    scanTitle:'Scan Carton Pick Up',cartonScanned:'carton discanned',
+    scanStatus:'Scan atau taip barcode',manualLabel:'Scanner luaran / taip manual:',
+    add:'Tambah',departBtn:'🚀 Selesai & Mula Perjalanan',backBtn:'‹ Kembali',
+    dupWarning:'Dah scan!',recentTrips:'Perjalanan Terkini',
+    confirmDepart:'Mula perjalanan dengan {n} carton yang discanned?',
+    confirmDepartZero:'Tiada carton discanned. Mahu teruskan juga?',
+  },
+  en:{
+    loginTitle:'Fleet Driver',loginSub:'Please sign in to begin your journey',
+    username:'Username',password:'Password',
+    userPlaceholder:'Enter username',passPlaceholder:'Enter password',
+    loginBtn:'Sign In',loginErr:'Incorrect username or password. Please try again.',loginLoading:'Signing in...',
+    logout:'Sign Out',yourLocation:'Current Location',gpsOn:'GPS Active ✓',gpsOff:'GPS Inactive',
+    noTrip:'No Active Trip',noTripSub:'You have no trips assigned at this time.',
+    tripAssigned:'Assigned',tripInTransit:'In Transit',tripArrived:'Completed',
+    startScan:'📦 Start Carton Scan (Pick Up)',startTrip:'🚀 Start Trip (Without Scan)',
+    arrived:'✅ Mark as Arrived',confirmArrive:'Please confirm arrival at this destination.',arriving:'Recording arrival...',
+    scanTitle:'Carton Pick-Up Scan',cartonScanned:'cartons scanned',
+    scanStatus:'Scan or enter barcode',manualLabel:'External scanner / manual entry:',
+    add:'Add',departBtn:'🚀 Complete & Start Trip',backBtn:'‹ Back',
+    dupWarning:'This carton has already been scanned.',recentTrips:'Recent Trips',
+    confirmDepart:'Start trip with {n} scanned carton(s)?',
+    confirmDepartZero:'No cartons have been scanned. Continue anyway?',
+  }
+};
+
+let _lang = localStorage.getItem('driver_lang') || 'en';
+let _driver = null;
+let _trip = null;
+let _gpsInterval = null;
+let _driverMap = null;
+let _driverMarker = null;
+let _destMarker = null;
+let _routeLine = null;
+let _destCoords = null;
+
+async function fetchOSRMRoute(fromLat, fromLng, toLat, toLng) {
+  try {
+    const url = 'https://router.project-osrm.org/route/v1/driving/' + fromLng + ',' + fromLat + ';' + toLng + ',' + toLat + '?geometries=geojson&overview=full';
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes[0]) {
+      return data.routes[0].geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+    }
+  } catch(e) {}
+  return null;
+}
+let _scanner = null;
+let _scans = []; // { barcode, time, dbId }
+let _regCartons = []; // registered cartons for current trip: { id, barcode, carton_no, total_cartons }
+let _allTrips = []; // all active trips for this driver
+let _currentTab = 'pickup'; // 'pickup' | 'delivery'
+
+// ── LANG ────────────────────────────────────────
+function setLang(l) {
+  _lang = l;
+  localStorage.setItem('driver_lang', l);
+  document.getElementById('btn-ms').classList.toggle('active', l === 'ms');
+  document.getElementById('btn-en').classList.toggle('active', l === 'en');
+  applyT();
+}
+function t(k, vars) {
+  let s = (T[_lang] && T[_lang][k]) ? T[_lang][k] : (T.ms[k] || k);
+  if (vars) Object.keys(vars).forEach(function(v){ s = s.replace('{'+v+'}', vars[v]); });
+  return s;
+}
+function applyT() {
+  document.querySelectorAll('[data-t]').forEach(function(el){ el.textContent = t(el.getAttribute('data-t')); });
+  document.querySelectorAll('[data-placeholder-t]').forEach(function(el){ el.placeholder = t(el.getAttribute('data-placeholder-t')); });
+}
+
+// ── LOGIN ────────────────────────────────────────
+async function doLogin() {
+  const user = document.getElementById('inp-user').value.trim();
+  const pass = document.getElementById('inp-pass').value;
+  const errEl = document.getElementById('login-err');
+  const btn = document.getElementById('login-btn');
+  if (!user || !pass) return;
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>' + t('loginLoading');
+  const { data, error } = await sb.from('fleet_drivers').select('*').ilike('name', user).eq('password', pass).single();
+  if (error || !data) {
+    errEl.textContent = t('loginErr'); errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = t('loginBtn'); return;
+  }
+  _driver = data;
+  localStorage.setItem('driver_session', JSON.stringify({ id: data.id }));
+  showHome();
+}
+
+function doLogout() {
+  stopGPS(); stopScanner();
+  _driver = null; _trip = null; _scans = []; _allTrips = []; _regCartons = [];
+  localStorage.removeItem('driver_session');
+  showScreen('screen-login');
+  document.getElementById('inp-pass').value = '';
+}
+
+// ── SCREENS ─────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+
+async function showHome() {
+  showScreen('screen-home');
+  document.getElementById('greet-name').textContent = _driver.name;
+  document.getElementById('greet-vehicle').textContent = _driver.phone || '';
+  await loadTrip();
+}
+
+// ── TABS ─────────────────────────────────────────
+function switchTripTab(tab) {
+  _currentTab = tab;
+  document.getElementById('tab-pickup').classList.toggle('active', tab === 'pickup');
+  document.getElementById('tab-delivery').classList.toggle('active', tab === 'delivery');
+  document.getElementById('tab-history').classList.toggle('active', tab === 'history');
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  if (tab === 'pickup') {
+    stopGPS();
+    renderPickupList();
+  } else if (tab === 'delivery') {
+    _trip = null;
+    renderDeliveryList();
+  } else {
+    _trip = null;
+    stopGPS();
+    renderTripHistory();
+  }
+}
+
+// ── TRIP ─────────────────────────────────────────
+async function loadTrip() {
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">⏳ Loading...</div>';
+  const { data: trips } = await sb.from('fleet_trips')
+    .select('*, vehicle:vehicle_id(plate_no,vehicle_type), leg')
+    .eq('driver_id', _driver.id)
+    .in('status', ['Assigned','Departed','Arrived'])
+    .order('created_at', { ascending: false });
+  // Exclude Arrived trips that already have POD confirmed (fully done)
+  _allTrips = (trips || []).filter(function(t){ return !(t.status === 'Arrived' && t.pod_confirmed_at); });
+
+  // For Leg 1 trips, fetch pickup boutique name via stock_requests (to_boutique = fulfiller due to DB swap)
+  var leg1Trips = _allTrips.filter(function(t){ return t.leg === 1 && t.do_no; });
+  if (leg1Trips.length) {
+    var leg1DoNos = leg1Trips.map(function(t){ return t.do_no; });
+    var { data: sreqs } = await sb.from('stock_requests')
+      .select('do_no, fulfiller:to_boutique_id(name)')
+      .in('do_no', leg1DoNos)
+      .limit(leg1DoNos.length * 5);
+    var doFulfillerMap = {};
+    (sreqs || []).forEach(function(r){
+      if (r.do_no && r.fulfiller && r.fulfiller.name) doFulfillerMap[r.do_no] = r.fulfiller.name;
+    });
+    _allTrips.forEach(function(t){
+      if (t.leg === 1 && t.do_no && doFulfillerMap[t.do_no]) t._pickupName = doFulfillerMap[t.do_no];
+    });
+  }
+
+  // Auto-select tab: if has Departed/Arrived trip, go to Delivery; else Pick Up
+  const hasDelivery = _allTrips.some(function(t){ return t.status === 'Departed' || t.status === 'Arrived'; });
+  const hasPickup   = _allTrips.some(function(t){ return t.status === 'Assigned'; });
+
+  // Update tab badges
+  const pickupCount   = _allTrips.filter(function(t){ return t.status === 'Assigned'; }).length;
+  const deliveryCount = _allTrips.filter(function(t){ return t.status === 'Departed' || t.status === 'Arrived'; }).length;
+  document.getElementById('tab-pickup').textContent   = '🚚 Pick Up'   + (pickupCount   > 0 ? ' (' + pickupCount   + ')' : '');
+  document.getElementById('tab-delivery').textContent = '📦 Delivery'  + (deliveryCount > 0 ? ' (' + deliveryCount + ')' : '');
+
+  // Auto-select tab with active trips
+  if (hasDelivery && !hasPickup) _currentTab = 'delivery';
+  else _currentTab = 'pickup';
+
+  document.getElementById('tab-pickup').classList.toggle('active', _currentTab === 'pickup');
+  document.getElementById('tab-delivery').classList.toggle('active', _currentTab === 'delivery');
+  document.getElementById('tab-history').classList.toggle('active', _currentTab === 'history');
+
+  _trip = null;
+  _destCoords = null;
+
+  if (_currentTab === 'pickup') {
+    renderPickupList();
+  } else {
+    renderDeliveryList();
+    const departedTrip = _allTrips.find(function(t){ return t.status === 'Departed'; });
+    if (departedTrip) { _trip = departedTrip; startGPS(); }
+  }
+}
+
+function renderTrip(showBack) {
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  // Back button (when opened from delivery list)
+  if (showBack) {
+    const backBtn = document.createElement('button');
+    backBtn.style.cssText = 'display:flex;align-items:center;gap:.4rem;background:transparent;border:none;color:var(--muted);font-size:.85rem;cursor:pointer;padding:.25rem 0;margin-bottom:.5rem;width:100%;max-width:420px';
+    backBtn.innerHTML = '‹ Back to List';
+    backBtn.addEventListener('click', function() {
+      document.getElementById('trip-map-wrap').style.display = 'none';
+      stopGPS();
+      if (_currentTab === 'pickup') renderPickupList();
+      else renderDeliveryList();
+    });
+    content.appendChild(backBtn);
+  }
+  if (!_trip) {
+    document.getElementById('trip-map-wrap').style.display = 'none';
+    const d = document.createElement('div');
+    d.className = 'no-trip';
+    d.innerHTML = '<div class="icon">📦</div><div style="font-weight:700;margin-bottom:.4rem">' + t('noTrip') + '</div><div style="font-size:.8rem">' + t('noTripSub') + '</div>';
+    content.appendChild(d);
+    loadRecentTrips();
+    return;
+  }
+
+  const statusLabel = { Assigned: t('tripAssigned'), Departed: t('tripInTransit'), Arrived: t('tripArrived') };
+  const statusClass = { Assigned: 'badge-assigned', Departed: 'badge-departed' };
+
+  const card = document.createElement('div');
+  card.className = 'trip-card';
+  const badge = document.createElement('div');
+  badge.className = 'trip-badge ' + (statusClass[_trip.status] || 'badge-assigned');
+  badge.textContent = statusLabel[_trip.status] || _trip.status;
+  card.appendChild(badge);
+  const doEl = document.createElement('div'); doEl.className = 'trip-do'; doEl.textContent = _trip.do_no || '—';
+  const destEl = document.createElement('div'); destEl.className = 'trip-dest';
+  const vehEl = document.createElement('div'); vehEl.className = 'trip-vehicle';
+  vehEl.textContent = _trip.vehicle ? (_trip.vehicle.plate_no + ' · ' + _trip.vehicle.vehicle_type) : '—';
+  card.appendChild(doEl); card.appendChild(destEl); card.appendChild(vehEl);
+
+  // Assigned = show PICKUP location (to_b = fulfiller), Departed = show DELIVERY destination
+  if (_trip.status === 'Assigned' && _trip.do_no) {
+    sb.from('stock_requests').select('to_b:to_boutique_id(name)').eq('do_no', _trip.do_no).limit(1).then(function(res){
+      const pickup = res.data && res.data[0] && res.data[0].to_b ? res.data[0].to_b.name : (_trip.destination || '—');
+      destEl.innerHTML = '<span style="font-size:.75rem;color:var(--muted)">📍 Pick Up From:</span><br>' + pickup
+        + '<div style="font-size:.72rem;color:var(--muted);margin-top:.15rem">→ ' + (_trip.destination || '—') + '</div>';
+    });
+  } else {
+    destEl.innerHTML = '<span style="font-size:.75rem;color:var(--muted)">📦 Deliver To:</span><br>' + (_trip.destination || '—');
+  }
+
+  // Scan count badge if assigned
+  if (_trip.status === 'Assigned') {
+    loadScanCount(card);
+  }
+  content.appendChild(card);
+
+  if (_trip.status === 'Assigned') {
+    const scanBtn = document.createElement('button');
+    scanBtn.className = 'action-btn btn-scan';
+    scanBtn.textContent = t('startScan');
+    scanBtn.addEventListener('click', openScan);
+    content.appendChild(scanBtn);
+  } else if (_trip.status === 'Departed') {
+    // Show carton scan summary
+    loadDeliveryCartonBadge(card);
+    document.getElementById('trip-map-wrap').style.display = 'block';
+    initDriverMap();
+    // Show destination pin immediately (before GPS fires)
+    if (_destCoords) {
+      const destIcon = L.divIcon({ className:'', html:'<div style="width:14px;height:14px;background:#10b981;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.4)"></div>', iconSize:[14,14], iconAnchor:[7,7] });
+      if (_destMarker) _driverMap.removeLayer(_destMarker);
+      _destMarker = L.marker([_destCoords.lat, _destCoords.lng], {icon:destIcon}).addTo(_driverMap).bindPopup('<b>🏁 ' + (_trip.destination || 'Destination') + '</b>');
+      _driverMap.setView([_destCoords.lat, _destCoords.lng], 14);
+    }
+    // Leg 1 → Drop at Warehouse + option to deliver direct; Leg 2 → Arrived
+    if (_trip.leg === 1) {
+      const whBtn = document.createElement('button');
+      whBtn.className = 'action-btn';
+      whBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+      whBtn.textContent = '🏭 Drop at Warehouse';
+      whBtn.addEventListener('click', doDropWarehouse);
+      content.appendChild(whBtn);
+      const directBtn = document.createElement('button');
+      directBtn.className = 'action-btn';
+      directBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+      directBtn.textContent = '🏪 Direct Delivery';
+      directBtn.addEventListener('click', doDirectDelivery);
+      content.appendChild(directBtn);
+    } else {
+      const arrBtn = document.createElement('button');
+      arrBtn.className = 'action-btn btn-arrived';
+      arrBtn.textContent = t('arrived');
+      arrBtn.addEventListener('click', doArrived);
+      content.appendChild(arrBtn);
+    }
+  } else if (_trip.status === 'Arrived') {
+    // Already arrived — show waiting for POD or open POD if confirmed
+    if (_trip.pod_confirmed_at) {
+      viewPOD(_trip.id);
+      return;
+    }
+    loadDeliveryCartonBadge(card);
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = 'text-align:center;padding:1.25rem 0 .5rem;width:100%;max-width:420px';
+    infoDiv.innerHTML = '<div style="font-size:2rem;margin-bottom:.35rem">📍</div>'
+      + '<div style="font-weight:700;margin-bottom:.25rem">Delivery Submitted</div>'
+      + '<div style="font-size:.8rem;color:var(--muted);margin-bottom:1rem">Awaiting boutique staff to confirm receipt of cartons.</div>';
+    content.appendChild(infoDiv);
+    const podBtn = document.createElement('button');
+    podBtn.id = 'pod-wait-btn';
+    podBtn.disabled = true;
+    podBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:var(--border);color:var(--muted);border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:not-allowed;opacity:.5';
+    podBtn.textContent = '📄 View POD';
+    content.appendChild(podBtn);
+    const hintDiv = document.createElement('div');
+    hintDiv.style.cssText = 'font-size:.72rem;color:var(--muted);margin-top:.6rem;text-align:center;width:100%;max-width:420px';
+    hintDiv.textContent = 'Button will unlock once boutique staff confirms receipt.';
+    content.appendChild(hintDiv);
+    // Poll for POD
+    const tripId = _trip.id;
+    const tripRef = _trip;
+    const poll = setInterval(async function() {
+      const { data } = await sb.from('fleet_trips').select('pod_confirmed_at, pod_confirmed_by, receiver_name, signature_image').eq('id', tripId).single();
+      if (data && data.pod_confirmed_at) {
+        clearInterval(poll);
+        if (tripRef.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', tripRef.vehicle_id);
+        await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+        Object.assign(tripRef, data);
+        _allTrips = _allTrips.filter(function(x){ return x.id !== tripId; });
+        viewPOD(tripId);
+      }
+    }, 5000);
+  }
+}
+
+async function loadScanCount(card) {
+  const scanRes = await sb.from('carton_scans').select('id', { count: 'exact', head: true }).eq('trip_id', _trip.id);
+  const scanned = scanRes.count || 0;
+
+  let expected = 0;
+  if (_trip.do_no) {
+    // Count all cartons for this DO
+    const { count: cntByDo } = await sb.from('cartons').select('id', { count: 'exact', head: true }).eq('do_no', _trip.do_no);
+    if (cntByDo > 0) {
+      expected = cntByDo;
+    } else {
+      // Fallback: get all batch_nos from stock_requests, count cartons by batch
+      const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', _trip.do_no);
+      const bkeys = (sr || []).map(r => r.batch_no || r.request_no).filter(Boolean);
+      if (bkeys.length) {
+        const { count: cntByBatch } = await sb.from('cartons').select('id', { count: 'exact', head: true }).in('batch_no', bkeys);
+        if (cntByBatch > 0) expected = cntByBatch;
+      }
+    }
+  }
+
+  const el = document.createElement('div');
+  el.style.cssText = 'margin-top:.4rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap';
+
+  const expBadge = document.createElement('span');
+  if (expected > 0) {
+    expBadge.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:#6366f120;border:1px solid var(--accent);color:var(--accent)';
+    expBadge.textContent = '📦 ' + expected + ' carton(s) expected';
+  } else {
+    expBadge.style.cssText = 'font-size:.72rem;font-weight:600;padding:.15rem .55rem;border-radius:20px;background:#33415520;border:1px solid var(--border);color:var(--muted)';
+    expBadge.textContent = '📦 No cartons registered';
+  }
+  el.appendChild(expBadge);
+
+  if (scanned > 0) {
+    const scanBadge = document.createElement('span');
+    const color = expected > 0 ? (scanned >= expected ? '#10b981' : '#f59e0b') : '#3b82f6';
+    scanBadge.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:' + color + '20;border:1px solid ' + color + ';color:' + color;
+    scanBadge.textContent = '✅ ' + scanned + (expected > 0 ? '/' + expected : '') + ' scanned';
+    el.appendChild(scanBadge);
+  }
+
+  card.appendChild(el);
+}
+
+async function loadDeliveryCartonBadge(card) {
+  if (!_trip || !_trip.do_no) return;
+  const [scanRes, cartonRes] = await Promise.all([
+    sb.from('carton_scans').select('id', { count: 'exact', head: true }).eq('trip_id', _trip.id),
+    sb.from('cartons').select('id', { count: 'exact', head: true }).eq('do_no', _trip.do_no)
+  ]);
+  const scanned = scanRes.count || 0;
+  const expected = cartonRes.count || 0;
+  if (scanned < 1 && expected < 1) return;
+  const el = document.createElement('div');
+  el.style.cssText = 'margin-top:.4rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap';
+  if (scanned > 0) {
+    const color = expected > 0 ? (scanned >= expected ? '#10b981' : '#f59e0b') : '#3b82f6';
+    const b = document.createElement('span');
+    b.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:' + color + '20;border:1px solid ' + color + ';color:' + color;
+    b.textContent = '📦 ' + scanned + (expected > 0 ? '/' + expected : '') + ' carton(s) delivered';
+    el.appendChild(b);
+  }
+  card.appendChild(el);
+}
+
+// ── SCAN SCREEN ──────────────────────────────────
+async function openScan() {
+  if (!_trip) return;
+  _scans = [];
+  _regCartons = [];
+
+  // Load existing scans in parallel with carton fetch
+  const existRes = await sb.from('carton_scans').select('id, barcode, scanned_at').eq('trip_id', _trip.id).order('scanned_at', { ascending: false });
+  (existRes.data || []).forEach(function(s){ _scans.push({ barcode: s.barcode, time: new Date(s.scanned_at), dbId: s.id }); });
+
+  // Fetch cartons: by do_no AND by all batch_nos (for pre-DO printed labels), then merge unique
+  let regData = [];
+  if (_trip.do_no) {
+    const { data: byDo } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').eq('do_no', _trip.do_no).order('carton_no');
+    regData = byDo || [];
+
+    // Also fetch cartons by batch_no for ALL requests in this DO (pre-DO prints may not have do_no set)
+    const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', _trip.do_no);
+    const bkeys = (sr || []).map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
+    if (bkeys.length) {
+      const { data: byBatch } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').in('batch_no', bkeys).order('carton_no');
+      if (byBatch && byBatch.length) {
+        // Merge: add any carton not already in regData (by id)
+        const existingIds = new Set(regData.map(function(c){ return c.id; }));
+        (byBatch || []).forEach(function(c){ if (!existingIds.has(c.id)) regData.push(c); });
+        regData.sort(function(a,b){ return a.carton_no - b.carton_no; });
+      }
+    }
+  }
+  _regCartons = regData;
+
+  document.getElementById('scan-do').textContent = _trip.do_no || '';
+  showScreen('screen-scan');
+  renderScanList();
+  updateScanCount();
+  startScanner();
+
+  setTimeout(function(){ document.getElementById('manual-input').focus(); }, 600);
+}
+
+function closeScan() {
+  stopScanner();
+  showScreen('screen-home');
+  loadTrip(); // refresh scan count badge
+}
+
+// ── CAMERA SCANNER ────────────────────────────────
+function startScanner() {
+  stopScanner();
+  const config = { fps: 10, qrbox: { width: 200, height: 140 }, aspectRatio: 1.5, rememberLastUsedCamera: true };
+  _scanner = new Html5Qrcode('reader');
+  _scanner.start({ facingMode: 'environment' }, config, function(decoded) {
+    processBarcode(decoded);
+  }, function(){}).catch(function(err){ console.warn('Camera:', err); });
+}
+
+function stopScanner() {
+  if (_scanner) {
+    _scanner.stop().catch(function(){});
+    _scanner = null;
+  }
+}
+
+// ── MANUAL / EXTERNAL SCANNER ─────────────────────
+function addManualScan() {
+  const inp = document.getElementById('manual-input');
+  const val = inp.value.trim();
+  if (!val) return;
+  processBarcode(val);
+  inp.value = '';
+  inp.focus();
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  const inp = document.getElementById('manual-input');
+  inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') addManualScan(); });
+});
+
+// ── PROCESS BARCODE ───────────────────────────────
+async function processBarcode(barcode) {
+  if (!barcode || !_trip) return;
+  const beep = document.getElementById('beep-dot');
+
+  // Flash indicator
+  beep.classList.add('active');
+  setTimeout(function(){ beep.classList.remove('active'); }, 300);
+
+  // Check duplicate
+  const isDup = _scans.some(function(s){ return s.barcode === barcode; });
+  if (isDup) { flashDuplicate(barcode); return; }
+
+  // Validate against registered cartons table — exact match first
+  let { data: regCarton } = await sb.from('cartons')
+    .select('id, do_no, carton_no, total_cartons, barcode')
+    .eq('barcode', barcode)
+    .eq('status', 'registered')
+    .limit(1);
+
+  // Fuzzy fallback: match on C{n}|{STO}| prefix, ignoring x/y segment
+  // Handles case where label barcode has different x/y than DB (e.g. label=1/2, DB=3/4)
+  if ((!regCarton || !regCarton.length) && barcode.includes('|')) {
+    var scanParts = barcode.split('|');
+    if (scanParts.length >= 2) {
+      var bPrefix = scanParts[0] + '|' + scanParts[1] + '|';
+      const { data: fuzzy } = await sb.from('cartons')
+        .select('id, do_no, carton_no, total_cartons, barcode')
+        .like('barcode', bPrefix + '%')
+        .eq('status', 'registered')
+        .limit(1);
+      if (fuzzy && fuzzy.length) {
+        regCarton = fuzzy;
+        barcode = fuzzy[0].barcode; // normalise to DB barcode for consistency
+      }
+    }
+  }
+
+  // Re-check duplicate after normalisation (label x/y may differ from DB)
+  if (regCarton && regCarton.length && _scans.some(function(s){ return s.barcode === barcode; })) {
+    flashDuplicate(barcode);
+    return;
+  }
+
+  const isValid = regCarton && regCarton.length > 0;
+
+  // If DO is set, also check barcode belongs to this trip's DO
+  let wrongDO = false;
+  if (isValid && _trip.do_no && regCarton[0].do_no && regCarton[0].do_no !== _trip.do_no) {
+    wrongDO = true;
+  }
+
+  if (!isValid) {
+    // Show unregistered warning
+    const statusEl = document.getElementById('scan-status');
+    if (statusEl) {
+      statusEl.textContent = '⚠️ Carton not registered! Barcode: ' + barcode;
+      statusEl.style.color = '#ef4444';
+      setTimeout(function(){ statusEl.textContent = ''; }, 3000);
+    }
+    return;
+  }
+
+  if (wrongDO) {
+    const statusEl = document.getElementById('scan-status');
+    if (statusEl) {
+      statusEl.textContent = '⚠️ Carton belongs to different DO!';
+      statusEl.style.color = '#f59e0b';
+      setTimeout(function(){ statusEl.textContent = ''; }, 3000);
+    }
+    return;
+  }
+
+  // Save to Supabase
+  const { data, error } = await sb.from('carton_scans').insert({
+    trip_id: _trip.id,
+    do_no: _trip.do_no,
+    barcode: barcode,
+    driver_id: _driver.id,
+    scanned_at: new Date().toISOString()
+  }).select('id').single();
+
+  if (error) { console.error(error); return; }
+
+  _scans.unshift({ barcode, time: new Date(), dbId: data ? data.id : null });
+
+  // If not in _regCartons yet (registered after openScan), add it
+  if (!_regCartons.find(function(c){ return c.barcode === barcode; })) {
+    _regCartons.push({
+      id: regCarton[0].id, barcode: barcode,
+      carton_no: regCarton[0].carton_no, total_cartons: regCarton[0].total_cartons
+    });
+  }
+
+  renderScanList();
+  updateScanCount();
+}
+
+function flashDuplicate(barcode) {
+  // Find item and flash it
+  const items = document.querySelectorAll('.scan-item');
+  items.forEach(function(item){
+    if (item.querySelector('.scan-barcode') && item.querySelector('.scan-barcode').textContent === barcode) {
+      item.style.background = '#f59e0b30';
+      setTimeout(function(){ item.style.background = ''; }, 800);
+    }
+  });
+}
+
+function updateScanCount() {
+  document.getElementById('scan-count').textContent = _scans.length;
+  const btn = document.getElementById('depart-btn');
+  btn.disabled = false; // allow depart even with 0 scans (with confirmation)
+}
+
+function renderScanList() {
+  const list = document.getElementById('scan-list');
+  list.innerHTML = '';
+
+  const scannedBarcodes = _scans.map(function(s){ return s.barcode; });
+
+  // Show registered carton checklist if available
+  if (_regCartons.length) {
+    // Main header
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:.5rem 1rem;font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em';
+    header.textContent = 'Carton List (' + _regCartons.length + ')';
+    list.appendChild(header);
+
+    // Group cartons by STO (sto_no field in barcode: C{n}|{STO}|...)
+    var stoGroups = {}; // { stoKey: [cartons] }
+    var stoOrder = [];
+    _regCartons.forEach(function(c) {
+      // Extract STO from barcode: C1|WH-ONLINE-PTX3CM|1/8|...  → WH-ONLINE-PTX3CM
+      var parts = c.barcode ? c.barcode.split('|') : [];
+      var stoKey = parts.length >= 2 ? parts[1] : ('STO-' + (c.sto_no || 'Unknown'));
+      if (!stoGroups[stoKey]) { stoGroups[stoKey] = []; stoOrder.push(stoKey); }
+      stoGroups[stoKey].push(c);
+    });
+
+    stoOrder.forEach(function(stoKey) {
+      var group = stoGroups[stoKey];
+      var scannedCount = group.filter(function(c){ return scannedBarcodes.includes(c.barcode); }).length;
+      var complete = scannedCount === group.length;
+      var stoColor = complete ? '#10b981' : '#ef4444';
+
+      // STO header row
+      var stoHdr = document.createElement('div');
+      stoHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.45rem 1rem;margin-top:.5rem;background:' + stoColor + '18;border-left:3px solid ' + stoColor + ';border-radius:0 6px 6px 0';
+      stoHdr.innerHTML = '<span style="font-size:.75rem;font-weight:800;color:' + stoColor + ';font-family:monospace">' + stoKey + '</span>'
+        + '<span style="font-size:.7rem;font-weight:700;color:' + stoColor + '">' + scannedCount + ' / ' + group.length + '</span>';
+      list.appendChild(stoHdr);
+
+      group.forEach(function(c, grpIdx){
+        const isScanned = scannedBarcodes.includes(c.barcode);
+        const scanEntry = isScanned ? _scans.find(function(s){ return s.barcode === c.barcode; }) : null;
+        const item = document.createElement('div');
+        item.className = 'scan-item';
+        item.style.cssText = 'transition:background .25s,border-color .25s;' + (isScanned ? 'background:#10b98115;border-color:#10b981' : '');
+
+        const timeStr = scanEntry ? scanEntry.time.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+        const scanIdx = isScanned ? _scans.findIndex(function(s){ return s.barcode === c.barcode; }) : -1;
+
+        // Rewrite barcode display: segment 3 = per-STO position (grpIdx+1/group.length)
+        var bParts = c.barcode ? c.barcode.split('|') : [];
+        if (bParts.length >= 3) bParts[2] = (grpIdx+1) + '/' + group.length;
+        var displayBarcode = bParts.length ? bParts.join('|') : (c.barcode || '—');
+
+        item.innerHTML =
+          '<div style="flex:1;min-width:0">'
+          + '<div class="scan-barcode" style="' + (isScanned ? 'color:#10b981' : '') + '">' + displayBarcode + '</div>'
+          + '<div class="scan-time">Carton ' + (grpIdx+1) + ' / ' + group.length + (timeStr ? ' &nbsp;·&nbsp; ' + timeStr : '') + '</div>'
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">'
+          + (isScanned
+              ? '<span style="color:#10b981;font-size:1.1rem;font-weight:700">✓</span>'
+                + '<button class="delete-scan" data-idx="' + scanIdx + '" style="opacity:.5">✕</button>'
+              : '<span style="color:var(--border);font-size:1rem">○</span>')
+          + '</div>';
+        list.appendChild(item);
+      });
+    });
+
+  } else if (_scans.length) {
+    // Fallback: show scanned list if no registered cartons found
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:.5rem 1rem;font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em';
+    header.textContent = 'Scanned (' + _scans.length + ')';
+    list.appendChild(header);
+
+    _scans.forEach(function(s, idx){
+      const item = document.createElement('div');
+      item.className = 'scan-item';
+      item.style.cssText = 'background:#10b98115;border-color:#10b981';
+      const timeStr = s.time.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      item.innerHTML =
+        '<div style="flex:1;min-width:0"><div class="scan-barcode" style="color:#10b981">' + s.barcode + '</div>'
+        + '<div class="scan-time">' + timeStr + '</div></div>'
+        + '<div style="display:flex;align-items:center;gap:.5rem">'
+        + '<span style="color:#10b981;font-size:1.1rem">✓</span>'
+        + '<button class="delete-scan" data-idx="' + idx + '">✕</button>'
+        + '</div>';
+      list.appendChild(item);
+    });
+
+  } else {
+    list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">' + t('scanStatus') + '</div>';
+  }
+
+  list.querySelectorAll('.delete-scan').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const i = parseInt(btn.getAttribute('data-idx'));
+      deleteScan(i);
+    });
+  });
+}
+
+async function deleteScan(idx) {
+  const s = _scans[idx];
+  if (s && s.dbId) await sb.from('carton_scans').delete().eq('id', s.dbId);
+  _scans.splice(idx, 1);
+  renderScanList();
+  updateScanCount();
+}
+
+// ── GPS TRACKING ─────────────────────────────────
+let _gpsWatchId = null;
+
+function startGPS() {
+  if (!navigator.geolocation) return;
+  const gpsEl = document.getElementById('gps-status');
+  // Use watchPosition for continuous updates
+  _gpsWatchId = navigator.geolocation.watchPosition(
+    async function(pos) {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      // Save to fleet_trips
+      if (_trip && _trip.id) {
+        await sb.from('fleet_trips').update({ lat: lat, lng: lng, last_location_update: new Date().toISOString() }).eq('id', _trip.id);
+      }
+      // Update map marker
+      if (_driverMap) {
+        const driverIcon = L.divIcon({ className:'', html:'<div style="width:14px;height:14px;background:#f97316;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.5)"></div>', iconSize:[14,14], iconAnchor:[7,7] });
+        if (_driverMarker) {
+          _driverMarker.setLatLng([lat, lng]);
+        } else {
+          _driverMarker = L.marker([lat, lng], { icon: driverIcon }).addTo(_driverMap).bindPopup('<b>📍 ' + t('yourLocation') + '</b>');
+          _driverMap.setView([lat, lng], 14);
+        }
+        // Draw route line to destination
+        if (_destCoords) {
+          if (_routeLine) _driverMap.removeLayer(_routeLine);
+          _routeLine = L.polyline([[lat, lng], [_destCoords.lat, _destCoords.lng]], { color:'#3b82f6', weight:3, dashArray:'6 4' }).addTo(_driverMap);
+          _driverMap.fitBounds([[lat, lng], [_destCoords.lat, _destCoords.lng]], { padding:[30,30] });
+        }
+      }
+      if (gpsEl) { gpsEl.textContent = t('gpsOn'); gpsEl.className = 'gps-on'; }
+    },
+    function(err) {
+      console.warn('GPS error:', err.message);
+      if (gpsEl) { gpsEl.textContent = t('gpsOff'); gpsEl.className = 'gps-off'; }
+    },
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+  );
+}
+
+function stopGPS() {
+  if (_gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(_gpsWatchId);
+    _gpsWatchId = null;
+  }
+  const gpsEl = document.getElementById('gps-status');
+  if (gpsEl) { gpsEl.textContent = t('gpsOff'); gpsEl.className = 'gps-off'; }
+}
+
+// ── DEPART ───────────────────────────────────────
+async function doDepart() {
+  const n = _scans.length;
+  const msg = n === 0 ? t('confirmDepartZero') : t('confirmDepart', { n });
+  if (!confirm(msg)) return;
+  const btn = document.getElementById('depart-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>' + t('loginLoading');
+  stopScanner();
+  const { error } = await sb.from('fleet_trips').update({ status:'Departed', departure_time: new Date().toISOString() }).eq('id', _trip.id);
+  if (error) { alert(error.message); btn.disabled = false; btn.textContent = t('departBtn'); return; }
+  // Update stock_requests to In Transit so it disappears from fleet Pick Up tab
+  if (_trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', _trip.do_no).eq('status', 'Pending Pick Up');
+    if (reqs && reqs.length) {
+      const reqIds = reqs.map(r => r.id);
+      await sb.from('stock_requests').update({ status: 'In Transit' }).in('id', reqIds);
+      const logNote = 'Driver departed | Driver: ' + _driver.name + ' | Cartons scanned: ' + _scans.length + ' | DO: ' + _trip.do_no;
+      await Promise.all(reqIds.map(function(id) {
+        return sb.from('request_status_log').insert({ request_id: id, status: 'In Transit', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  _trip.status = 'Departed';
+  showScreen('screen-home');
+  switchTripTab('delivery');
+  startGPS();
+}
+
+// ── DROP AT WAREHOUSE ────────────────────────────
+async function doDropWarehouse() {
+  if (!_trip) return;
+  if (!confirm('Please confirm drop-off at the warehouse.')) return;
+  stopGPS();
+  const { error } = await sb.from('fleet_trips').update({
+    status: 'At Warehouse',
+    arrival_time: new Date().toISOString()
+  }).eq('id', _trip.id);
+  if (error) { alert('Error: ' + error.message); return; }
+  // Update stock_requests to 'In Transit At Warehouse' and log
+  if (_trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', _trip.do_no);
+    if (reqs && reqs.length) {
+      const reqIds = reqs.map(r => r.id);
+      await sb.from('stock_requests').update({ status: 'In Transit At Warehouse' }).in('id', reqIds);
+      const logNote = 'Dropped at warehouse | Driver: ' + _driver.name + ' | DO: ' + _trip.do_no;
+      await Promise.all(reqIds.map(function(id) {
+        return sb.from('request_status_log').insert({ request_id: id, status: 'In Transit At Warehouse', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  // Free vehicle & driver
+  if (_trip.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', _trip.vehicle_id);
+  await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+  // Show confirmation
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  const done = document.createElement('div');
+  done.style.cssText = 'text-align:center;padding:2rem;width:100%;max-width:420px';
+  done.innerHTML = '<div style="font-size:3rem">🏭</div>'
+    + '<div style="font-weight:800;font-size:1.1rem;margin:.5rem 0">Dropped at Warehouse</div>'
+    + '<div style="font-size:.8rem;color:var(--muted)">' + (_trip.do_no || '') + ' has been delivered to the warehouse.<br>Please await further delivery assignment.</div>';
+  content.appendChild(done);
+  _trip = null;
+  setTimeout(loadTrip, 2000);
+}
+
+// ── DIRECT DELIVERY (Leg 1 → skip warehouse, wait for POD) ──
+async function doDirectDelivery() {
+  if (!_trip) return;
+  if (!confirm('Please confirm arrival at this destination.\n\nBoutique staff will need to scan cartons to complete delivery.')) return;
+  stopGPS();
+  const { error } = await sb.from('fleet_trips').update({
+    status: 'Arrived',
+    arrival_time: new Date().toISOString()
+  }).eq('id', _trip.id);
+  if (error) { alert('Error: ' + error.message); return; }
+  // Log arrival
+  if (_trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', _trip.do_no);
+    if (reqs && reqs.length) {
+      const logNote = 'Out for delivery | Driver: ' + _driver.name + ' | DO: ' + _trip.do_no;
+      await Promise.all(reqs.map(function(r) {
+        return sb.from('request_status_log').insert({ request_id: r.id, status: 'Out for Delivery', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  // Show waiting screen
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  const waitDiv = document.createElement('div');
+  waitDiv.style.cssText = 'text-align:center;padding:2rem;width:100%;max-width:420px';
+  waitDiv.innerHTML =
+    '<div style="font-size:3rem;margin-bottom:.5rem">📍</div>'
+    + '<div style="font-weight:800;font-size:1.1rem;margin-bottom:.3rem">Delivery Submitted</div>'
+    + '<div style="font-size:.85rem;font-weight:600;color:var(--accent);margin-bottom:.25rem">' + (_trip.destination || '') + '</div>'
+    + '<div style="font-size:.8rem;color:var(--muted);margin-bottom:1.5rem">Awaiting boutique staff to confirm receipt of cartons.</div>'
+    + '<button id="pod-wait-btn" disabled style="width:100%;max-width:420px;padding:.9rem;background:var(--border);color:var(--muted);border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:not-allowed;margin-top:.5rem;opacity:.5">📄 View POD</button>'
+    + '<div style="font-size:.72rem;color:var(--muted);margin-top:.6rem">Button will unlock once boutique staff confirms receipt.</div>';
+  content.appendChild(waitDiv);
+
+  // Poll for POD confirmation
+  const tripId = _trip.id;
+  const tripRef = _trip;
+  const podPoll = setInterval(async function() {
+    const { data } = await sb.from('fleet_trips').select('pod_confirmed_at, pod_confirmed_by, receiver_name, signature_image').eq('id', tripId).single();
+    if (data && data.pod_confirmed_at) {
+      clearInterval(podPoll);
+      // Free vehicle and driver
+      if (tripRef.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', tripRef.vehicle_id);
+      await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+      // Update local trip ref and show POD
+      Object.assign(tripRef, data);
+      _allTrips = _allTrips.filter(function(x){ return x.id !== tripId; });
+      viewPOD(tripId);
+    }
+  }, 5000);
+}
+
+// ── ARRIVED ──────────────────────────────────────
+async function doArrived() {
+  if (!confirm(t('confirmArrive'))) return;
+  stopGPS();
+  const { error } = await sb.from('fleet_trips').update({ status:'Arrived', arrival_time: new Date().toISOString() }).eq('id', _trip.id);
+  if (error) { alert(error.message); return; }
+  if (_trip.vehicle_id) await sb.from('fleet_vehicles').update({ status:'Available' }).eq('id', _trip.vehicle_id);
+  await sb.from('fleet_drivers').update({ status:'Available' }).eq('id', _driver.id);
+  // Log arrival
+  if (_trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', _trip.do_no);
+    if (reqs && reqs.length) {
+      const logNote = 'Driver arrived at destination | Driver: ' + _driver.name + ' | DO: ' + _trip.do_no;
+      await Promise.all(reqs.map(function(r) {
+        return sb.from('request_status_log').insert({ request_id: r.id, status: 'Arrived', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  _trip = null;
+  renderTrip();
+}
+
+// ═══════════════════════════════════════════════════
+// DELIVERY LIST — multi-trip drag & drop + POD
+// ═══════════════════════════════════════════════════
+let _deliveryTrips = [];
+let _dragSrcIdx = null;
+let _pollTimer = null;
+
+let _pickupTrips = [];
+let _dragPickupSrcIdx = null;
+
+function renderPickupList() {
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  _pickupTrips = _allTrips.filter(function(t){ return t.status === 'Assigned'; })
+    .sort(function(a,b){ return (a.driver_sequence||0) - (b.driver_sequence||0); });
+  if (!_pickupTrips.length) {
+    content.innerHTML = '<div class="no-trip"><div class="icon">🚚</div><div style="font-weight:700;margin-bottom:.4rem">No Pick-Up Trips</div><div style="font-size:.8rem">Awaiting assignment from administrator.</div></div>';
+    loadRecentTrips();
+    return;
+  }
+  const list = document.createElement('div');
+  list.id = 'pickup-list-el';
+  list.style.cssText = 'width:100%;max-width:420px;display:flex;flex-direction:column;gap:.75rem';
+
+  _pickupTrips.forEach(function(trip, idx) {
+    const card = document.createElement('div');
+    card.className = 'delivery-item';
+    card.setAttribute('data-idx', idx);
+    card.draggable = true;
+    card.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;transition:border-color .15s';
+    card.innerHTML =
+      '<div style="display:flex;align-items:center;gap:.75rem">'
+      + '<span class="drag-handle" style="flex-shrink:0">⠿</span>'
+      + '<div style="flex:1">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">'
+      + '<span style="font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:20px;background:#6366f120;border:1px solid #6366f1;color:#6366f1">Assigned</span>'
+      + (trip.leg === 1 ? '<span style="font-size:.6rem;padding:.1rem .35rem;border-radius:4px;background:#6366f115;color:#6366f1;border:1px solid #6366f1">Leg 1</span>' : '')
+      + '</div>'
+      + '<div style="font-weight:800;font-family:monospace;color:var(--accent);margin-bottom:.3rem">' + (trip.do_no || '—') + '</div>'
+      + '<div style="font-size:.85rem;font-weight:600;margin-bottom:.2rem">'
+        + (trip.leg === 1 ? '<span style="font-size:.65rem;color:#6366f1;font-weight:600">🏭 PICKUP: </span>' : '')
+        + (trip.leg === 1 ? (trip._pickupName || trip.destination || '—') : (trip.destination || '—'))
+        + '</div>'
+      + '<div style="font-size:.75rem;color:var(--muted)">' + (trip.vehicle ? trip.vehicle.plate_no + ' · ' + trip.vehicle.vehicle_type : '—') + '</div>'
+      + '</div>'
+      + '</div>';
+    card.addEventListener('click', function(e) {
+      if (e.target.classList.contains('drag-handle')) return;
+      openTripDetail(trip.id);
+    });
+    list.appendChild(card);
+  });
+  content.appendChild(list);
+  initPickupDragDrop();
+}
+
+function initPickupDragDrop() {
+  const list = document.getElementById('pickup-list-el');
+  if (!list) return;
+  const items = list.querySelectorAll('.delivery-item[draggable="true"]');
+  items.forEach(function(item){
+    var srcIdx;
+    // Desktop
+    item.addEventListener('dragstart', function(e){
+      srcIdx = parseInt(item.getAttribute('data-idx'));
+      _dragPickupSrcIdx = srcIdx;
+      setTimeout(function(){ item.classList.add('dragging'); }, 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', function(){ item.classList.remove('dragging'); list.querySelectorAll('.delivery-item').forEach(function(i){ i.classList.remove('drag-over'); }); });
+    item.addEventListener('dragover', function(e){ e.preventDefault(); list.querySelectorAll('.delivery-item').forEach(function(i){ i.classList.remove('drag-over'); }); item.classList.add('drag-over'); });
+    item.addEventListener('drop', function(e){
+      e.preventDefault(); item.classList.remove('drag-over');
+      var toIdx = parseInt(item.getAttribute('data-idx'));
+      if (_dragPickupSrcIdx !== null && _dragPickupSrcIdx !== toIdx) reorderPickup(_dragPickupSrcIdx, toIdx);
+      _dragPickupSrcIdx = null;
+    });
+    // Mobile touch
+    var handle = item.querySelector('.drag-handle');
+    if (!handle) return;
+    var ghost = null, touchSrc = null, startY = 0;
+    handle.addEventListener('touchstart', function(e){
+      touchSrc = parseInt(item.getAttribute('data-idx'));
+      startY = e.touches[0].clientY;
+      ghost = item.cloneNode(true);
+      ghost.style.cssText = 'position:fixed;left:1rem;right:1rem;opacity:.85;pointer-events:none;z-index:999;border-color:var(--accent);background:var(--card);border-radius:14px;padding:1rem';
+      ghost.style.top = item.getBoundingClientRect().top + 'px';
+      document.body.appendChild(ghost);
+      item.classList.add('dragging');
+      e.preventDefault();
+    }, { passive: false });
+    handle.addEventListener('touchmove', function(e){
+      if (!ghost) return;
+      var dy = e.touches[0].clientY - startY;
+      ghost.style.top = (item.getBoundingClientRect().top + dy) + 'px';
+      var ty = e.touches[0].clientY;
+      list.querySelectorAll('.delivery-item').forEach(function(el){
+        var r = el.getBoundingClientRect();
+        el.classList.toggle('drag-over', ty >= r.top && ty <= r.bottom && el !== item);
+      });
+      e.preventDefault();
+    }, { passive: false });
+    handle.addEventListener('touchend', function(){
+      if (ghost) { ghost.remove(); ghost = null; }
+      item.classList.remove('dragging');
+      var over = list.querySelector('.delivery-item.drag-over');
+      if (over) {
+        over.classList.remove('drag-over');
+        var toIdx2 = parseInt(over.getAttribute('data-idx'));
+        if (touchSrc !== null && touchSrc !== toIdx2) reorderPickup(touchSrc, toIdx2);
+      }
+      touchSrc = null;
+    });
+  });
+}
+
+async function reorderPickup(fromIdx, toIdx) {
+  var moved = _pickupTrips.splice(fromIdx, 1)[0];
+  _pickupTrips.splice(toIdx, 0, moved);
+  await Promise.all(_pickupTrips.map(function(t, i){ return sb.from('fleet_trips').update({ driver_sequence: i }).eq('id', t.id); }));
+  renderPickupList();
+}
+
+function renderDeliveryList() {
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  _deliveryTrips = _allTrips
+    .filter(function(t){ return t.status === 'Departed' || t.status === 'Arrived'; })
+    .sort(function(a,b){ return (a.driver_sequence||0) - (b.driver_sequence||0); });
+
+  if (!_deliveryTrips.length) {
+    content.innerHTML = '<div class="no-trip"><div class="icon">📦</div><div style="font-weight:700;margin-bottom:.4rem">No Active Deliveries</div><div style="font-size:.8rem">Please begin from the Pick Up tab.</div></div>';
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'delivery-list'; list.id = 'delivery-list-el';
+  _deliveryTrips.forEach(function(trip, idx){ list.appendChild(buildDeliveryItem(trip, idx)); });
+  content.appendChild(list);
+  initDragDrop();
+  pollDeliveryStatus();
+}
+
+// ── TRIP HISTORY ─────────────────────────────────
+var _historyTrips = [];
+
+async function renderTripHistory() {
+  const content = document.getElementById('trip-content');
+  if (!_driver) return;
+
+  // Build the static shell (filter bar + list container) once
+  content.innerHTML =
+    '<div style="display:flex;gap:.4rem;margin-bottom:.6rem;flex-wrap:wrap;width:100%">'
+      + '<input type="date" id="hf-date" style="flex:1;min-width:120px;padding:.4rem .6rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyHistoryFilter()">'
+      + '<input type="text" id="hf-loc"  placeholder="🔍 Lokasi..." style="flex:2;min-width:120px;padding:.4rem .6rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyHistoryFilter()">'
+      + '<input type="text" id="hf-do"   placeholder="🔍 DO No..." style="flex:2;min-width:120px;padding:.4rem .6rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyHistoryFilter()">'
+      + '<button onclick="document.getElementById(\'hf-date\').value=\'\';document.getElementById(\'hf-loc\').value=\'\';document.getElementById(\'hf-do\').value=\'\';applyHistoryFilter()" style="padding:.4rem .65rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.78rem;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div id="hist-list"><div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">⏳ Loading...</div></div>';
+
+  const { data: trips } = await sb.from('fleet_trips')
+    .select('id, do_no, destination, departure_time, arrival_time, pod_confirmed_at, status, leg')
+    .eq('driver_id', _driver.id)
+    .in('status', ['Delivered', 'Arrived', 'At Warehouse'])
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  // Deduplicate by do_no — keep highest-priority status per DO
+  var statusRank = { 'Delivered': 3, 'Arrived': 2, 'At Warehouse': 1 };
+  var doMap = {};
+  (trips || []).forEach(function(t) {
+    var key = t.do_no || t.id;
+    var existing = doMap[key];
+    if (!existing || (statusRank[t.status] || 0) > (statusRank[existing.status] || 0)) {
+      doMap[key] = t;
+    }
+  });
+  _historyTrips = Object.values(doMap);
+  applyHistoryFilter();
+}
+
+function applyHistoryFilter() {
+  var listEl = document.getElementById('hist-list');
+  if (!listEl) return;
+
+  var selDate = (document.getElementById('hf-date') || {}).value || '';
+  var selLoc  = ((document.getElementById('hf-loc')  || {}).value || '').toLowerCase().trim();
+  var selDo   = ((document.getElementById('hf-do')   || {}).value || '').toLowerCase().trim();
+
+  var filtered = _historyTrips.filter(function(t) {
+    if (selDate) {
+      var d = (t.departure_time || t.arrival_time || '').slice(0, 10);
+      if (d !== selDate) return false;
+    }
+    if (selLoc && !(t.destination || '').toLowerCase().includes(selLoc)) return false;
+    if (selDo  && !(t.do_no || '').toLowerCase().includes(selDo))  return false;
+    return true;
+  });
+
+  var isFiltered = selDate || selLoc || selDo;
+  var fmt = function(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-MY', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  };
+  var fmtShort = function(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-MY', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+  };
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="no-trip"><div class="icon">📋</div>'
+      + '<div style="font-weight:700;margin-bottom:.4rem">' + (isFiltered ? 'Tiada trip ditemui' : 'No Trip History') + '</div>'
+      + '<div style="font-size:.8rem;color:var(--muted)">' + (isFiltered ? 'Cuba tukar filter.' : 'Completed trips will appear here.') + '</div></div>';
+    return;
+  }
+
+  var html = '<div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:.1rem 0 .6rem">'
+    + filtered.length + ' Trip(s)' + (isFiltered ? ' (ditapis)' : '') + '</div>';
+
+  filtered.forEach(function(trip) {
+    var isDelivered = trip.status === 'Delivered';
+    var isWH        = trip.status === 'At Warehouse';
+    var badgeBg    = isDelivered ? '#10b98120' : isWH ? '#3b82f620' : '#f59e0b20';
+    var badgeColor = isDelivered ? 'var(--green)' : isWH ? '#3b82f6' : 'var(--yellow)';
+    var badgeText  = isDelivered ? '✅ Delivered' : isWH ? '🏭 At Warehouse' : '📍 Arrived';
+
+    html += '<div onclick="viewPOD(\'' + trip.id + '\',true)" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.6rem;cursor:pointer">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">'
+        + '<span style="font-weight:800;font-size:.88rem;color:var(--accent)">' + (trip.do_no || '—') + '</span>'
+        + '<span style="font-size:.68rem;padding:.15rem .5rem;border-radius:10px;font-weight:700;background:' + badgeBg + ';color:' + badgeColor + '">' + badgeText + '</span>'
+      + '</div>'
+      + '<div style="font-size:.8rem;font-weight:600;margin-bottom:.3rem">' + (trip.destination || '—') + '</div>'
+      + '<div style="display:flex;gap:1.5rem;font-size:.72rem;color:var(--muted)">'
+        + '<span>🚀 ' + fmtShort(trip.departure_time) + '</span>'
+        + '<span>📍 ' + fmtShort(trip.arrival_time) + '</span>'
+      + '</div>'
+      + (trip.pod_confirmed_at ? '<div style="font-size:.7rem;color:var(--green);margin-top:.3rem">✅ POD: ' + fmt(trip.pod_confirmed_at) + '</div>' : '')
+      + '</div>';
+  });
+
+  listEl.innerHTML = html;
+}
+
+function buildDeliveryItem(trip, idx) {
+  const departed = trip.departure_time ? new Date(trip.departure_time) : null;
+  const etaTime  = departed ? new Date(departed.getTime() + idx * 45 * 60000) : null;
+  const etaStr   = etaTime ? etaTime.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}) : '—';
+  const isArrived = trip.status === 'Arrived';
+  const isPOD     = !!trip.pod_confirmed_at;
+
+  const item = document.createElement('div');
+  item.className = 'delivery-item';
+  item.setAttribute('data-trip-id', trip.id);
+  item.setAttribute('data-idx', idx);
+  item.draggable = !isArrived;
+
+  let statusText = '🚚 In Transit';
+  // leg 1 = pick-up driver (warehouse drop only); leg 2 = delivery driver (mark arrived at boutique)
+  let actionHTML = trip.leg === 1
+    ? '<div style="display:flex;flex-direction:column;gap:.4rem">'
+      + '<button class="btn-arrived-sm" style="background:#3b82f6" onclick="markDropWarehouse(\'' + trip.id + '\',\'' + (trip.vehicle_id||'') + '\')">🏭 Drop at Warehouse</button>'
+      + '<button class="btn-arrived-sm" style="background:#10b981" onclick="markDirectDelivery(\'' + trip.id + '\')">🏪 Direct Delivery</button>'
+      + '</div>'
+    : '<button class="btn-arrived-sm" onclick="markArrived(\'' + trip.id + '\')">📍 Mark as Arrived</button>';
+  if (isPOD) {
+    statusText = '✅ POD Confirmed';
+    actionHTML = '<button class="btn-pod" onclick="viewPOD(\'' + trip.id + '\')">📄 View POD</button>';
+  } else if (isArrived) {
+    statusText = '📍 Arrived — Awaiting staff carton scan';
+    actionHTML = '<span class="btn-waiting">⏳ Awaiting boutique confirmation...</span>';
+  }
+
+  item.innerHTML =
+    '<div class="delivery-item-header">'
+    + (isArrived ? '<span style="font-size:1.1rem;color:var(--border)">⠿</span>' : '<span class="drag-handle">⠿</span>')
+    + '<span class="seq-num">' + (idx + 1) + '</span>'
+    + '<span class="delivery-do">' + (trip.do_no || '—') + '</span>'
+    + (!isArrived ? '<span class="delivery-eta">ETA ' + etaStr + '</span>' : '')
+    + '</div>'
+    + '<div class="delivery-dest">'
+      + (trip.leg === 1 ? '<span style="font-size:.65rem;color:#6366f1;font-weight:600">🏭 PICKUP: </span>' : '')
+      + (trip.leg === 1 ? (trip._pickupName || trip.destination || '—') : (trip.destination || '—'))
+      + '</div>'
+    + '<div class="delivery-status">' + statusText + '</div>'
+    + '<div class="delivery-actions">' + actionHTML + '</div>';
+
+  // Click card body (not the button) to open detail view — allow for Arrived (awaiting POD) too
+  if (!isPOD) {
+    item.style.cursor = 'pointer';
+    item.addEventListener('click', function(e) {
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+      openTripDetail(trip.id);
+    });
+  }
+
+  return item;
+}
+
+function initDragDrop() {
+  const list = document.getElementById('delivery-list-el');
+  if (!list) return;
+  const items = list.querySelectorAll('.delivery-item[draggable="true"]');
+
+  items.forEach(function(item){
+    var srcIdx;
+    // Desktop
+    item.addEventListener('dragstart', function(e){
+      srcIdx = parseInt(item.getAttribute('data-idx'));
+      _dragSrcIdx = srcIdx;
+      setTimeout(function(){ item.classList.add('dragging'); }, 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', function(){ item.classList.remove('dragging'); list.querySelectorAll('.delivery-item').forEach(function(i){ i.classList.remove('drag-over'); }); });
+    item.addEventListener('dragover', function(e){ e.preventDefault(); list.querySelectorAll('.delivery-item').forEach(function(i){ i.classList.remove('drag-over'); }); item.classList.add('drag-over'); });
+    item.addEventListener('drop', function(e){
+      e.preventDefault(); item.classList.remove('drag-over');
+      var toIdx = parseInt(item.getAttribute('data-idx'));
+      if (_dragSrcIdx !== null && _dragSrcIdx !== toIdx) reorderDelivery(_dragSrcIdx, toIdx);
+      _dragSrcIdx = null;
+    });
+
+    // Mobile touch
+    var handle = item.querySelector('.drag-handle');
+    if (!handle) return;
+    var ghost = null, touchSrc = null, startY = 0;
+    handle.addEventListener('touchstart', function(e){
+      touchSrc = parseInt(item.getAttribute('data-idx'));
+      startY = e.touches[0].clientY;
+      ghost = item.cloneNode(true);
+      ghost.style.cssText = 'position:fixed;left:1rem;right:1rem;opacity:.85;pointer-events:none;z-index:999;border-color:var(--accent);background:var(--card);border-radius:14px;padding:1rem';
+      ghost.style.top = item.getBoundingClientRect().top + 'px';
+      document.body.appendChild(ghost);
+      item.classList.add('dragging');
+      e.preventDefault();
+    }, { passive: false });
+    handle.addEventListener('touchmove', function(e){
+      if (!ghost) return;
+      var dy = e.touches[0].clientY - startY;
+      ghost.style.top = (item.getBoundingClientRect().top + dy) + 'px';
+      var ty = e.touches[0].clientY;
+      list.querySelectorAll('.delivery-item').forEach(function(el){
+        var r = el.getBoundingClientRect();
+        el.classList.toggle('drag-over', ty >= r.top && ty <= r.bottom && el !== item);
+      });
+      e.preventDefault();
+    }, { passive: false });
+    handle.addEventListener('touchend', function(){
+      if (ghost) { ghost.remove(); ghost = null; }
+      item.classList.remove('dragging');
+      var over = list.querySelector('.delivery-item.drag-over');
+      if (over) {
+        over.classList.remove('drag-over');
+        var toIdx2 = parseInt(over.getAttribute('data-idx'));
+        if (touchSrc !== null && touchSrc !== toIdx2) reorderDelivery(touchSrc, toIdx2);
+      }
+      touchSrc = null;
+    });
+  });
+}
+
+async function reorderDelivery(fromIdx, toIdx) {
+  var moved = _deliveryTrips.splice(fromIdx, 1)[0];
+  _deliveryTrips.splice(toIdx, 0, moved);
+  await Promise.all(_deliveryTrips.map(function(t, i){ return sb.from('fleet_trips').update({ driver_sequence: i }).eq('id', t.id); }));
+  renderDeliveryList();
+}
+
+async function openTripDetail(tripId) {
+  const found = _allTrips.find(function(t){ return t.id === tripId; });
+  if (!found) return;
+  _trip = found;
+  // Fetch destination coords
+  _destCoords = null;
+  if (_trip.destination) {
+    const { data: bout } = await sb.from('boutiques').select('latitude,longitude').eq('name', _trip.destination).maybeSingle();
+    if (bout && bout.latitude && bout.longitude) _destCoords = { lat: bout.latitude, lng: bout.longitude };
+  }
+  renderTrip(true); // true = show back button
+}
+
+async function markDropWarehouse(tripId, vehicleId) {
+  if (!confirm('Please confirm drop-off at the warehouse.')) return;
+  await sb.from('fleet_trips').update({ status: 'At Warehouse', arrival_time: new Date().toISOString() }).eq('id', tripId);
+  var trip = _allTrips.find(function(x){ return x.id === tripId; });
+  // Update stock_requests to 'In Transit At Warehouse' and log
+  if (trip && trip.do_no) {
+    var { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', trip.do_no);
+    if (reqs && reqs.length) {
+      var reqIds = reqs.map(function(r){ return r.id; });
+      await sb.from('stock_requests').update({ status: 'In Transit At Warehouse' }).in('id', reqIds);
+      var logNote = 'Dropped at warehouse | Driver: ' + _driver.name + ' | DO: ' + trip.do_no;
+      await Promise.all(reqIds.map(function(id) {
+        return sb.from('request_status_log').insert({ request_id: id, status: 'In Transit At Warehouse', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  if (vehicleId) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', vehicleId);
+  await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+  if (trip) trip.status = 'At Warehouse';
+  _allTrips = _allTrips.filter(function(x){ return x.id !== tripId; });
+  renderDeliveryList();
+}
+
+async function markArrived(tripId) {
+  if (!confirm(t('confirmArrive'))) return;
+  var t = _allTrips.find(function(x){ return x.id === tripId; });
+  await sb.from('fleet_trips').update({ status:'Arrived', arrival_time: new Date().toISOString() }).eq('id', tripId);
+  if (t && t.do_no) {
+    var { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', t.do_no);
+    if (reqs && reqs.length) {
+      var logNote = 'Driver arrived | Driver: ' + (_driver ? _driver.name : '') + ' | DO: ' + t.do_no;
+      await Promise.all(reqs.map(function(r){ return sb.from('request_status_log').insert({ request_id: r.id, status: 'Arrived', note: logNote, changed_by: _driver ? _driver.name : '' }); }));
+    }
+  }
+  if (t) t.status = 'Arrived';
+  renderDeliveryList();
+}
+
+async function markDirectDelivery(tripId) {
+  if (!confirm('Confirm arrival at this destination?\n\nBoutique staff will need to scan cartons to complete delivery.')) return;
+  var tr = _allTrips.find(function(x){ return x.id === tripId; });
+  await sb.from('fleet_trips').update({ status:'Arrived', arrival_time: new Date().toISOString() }).eq('id', tripId);
+  if (tr && tr.do_no) {
+    var { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', tr.do_no);
+    if (reqs && reqs.length) {
+      var logNote = 'Out for delivery | Driver: ' + (_driver ? _driver.name : '') + ' | DO: ' + tr.do_no;
+      await Promise.all(reqs.map(function(r){ return sb.from('request_status_log').insert({ request_id: r.id, status: 'Out for Delivery', note: logNote, changed_by: _driver ? _driver.name : '' }); }));
+    }
+  }
+  if (tr) tr.status = 'Arrived';
+  renderDeliveryList();
+}
+
+function pollDeliveryStatus() {
+  clearTimeout(_pollTimer);
+  var pending = _deliveryTrips.filter(function(t){ return t.status === 'Arrived' && !t.pod_confirmed_at; });
+  if (!pending.length) return;
+  _pollTimer = setTimeout(async function(){
+    var ids = pending.map(function(t){ return t.id; });
+    var { data } = await sb.from('fleet_trips').select('id, status, pod_confirmed_at, pod_confirmed_by, arrival_time').in('id', ids);
+    if (data) {
+      data.forEach(function(fresh){
+        var ex = _allTrips.find(function(t){ return t.id === fresh.id; });
+        if (ex) Object.assign(ex, fresh);
+      });
+      var confirmed = data.filter(function(t){ return !!t.pod_confirmed_at; });
+      if (confirmed.length) renderDeliveryList();
+      else pollDeliveryStatus();
+    }
+  }, 5000);
+}
+
+async function viewPOD(tripId, readOnly) {
+  // Always fetch fresh — signature is saved by receive-app after local _allTrips is stale
+  var { data: fresh } = await sb.from('fleet_trips')
+    .select('id, do_no, destination, arrival_time, pod_confirmed_at, pod_confirmed_by, vehicle_id, receiver_name, signature_image, pod_photo')
+    .eq('id', tripId).single();
+  var trip = fresh || _allTrips.find(function(t){ return t.id === tripId; });
+  if (!trip) return;
+  var [reqRes, cartonByDo] = await Promise.all([
+    sb.from('stock_requests').select('id, do_no, batch_no, request_no, from_b:from_boutique_id(name), to_b:to_boutique_id(name)').eq('do_no', trip.do_no),
+    sb.from('cartons').select('barcode, carton_no, total_cartons').eq('do_no', trip.do_no)
+  ]);
+  var req = reqRes.data && reqRes.data[0] ? reqRes.data[0] : null;
+  var cartons = cartonByDo.data || [];
+  // Fallback: fetch by batch_no if no cartons found via do_no
+  if (!cartons.length && reqRes.data && reqRes.data.length) {
+    var bkeys = reqRes.data.map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
+    if (bkeys.length) {
+      var { data: byBatch } = await sb.from('cartons').select('barcode, carton_no, total_cartons').in('batch_no', bkeys);
+      cartons = byBatch || [];
+    }
+  }
+  var fmt = function(d){ return d ? new Date(d).toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'; };
+
+  document.getElementById('pod-details').innerHTML = [
+    ['DO No.', trip.do_no || '—'],
+    ['From', req && req.to_b ? req.to_b.name : '—'],
+    ['To', trip.destination || '—'],
+    ['Driver', _driver ? _driver.name : '—'],
+    ['Arrived', fmt(trip.arrival_time)],
+    ['Confirmed By', trip.pod_confirmed_by || '—'],
+    ['POD Timestamp', fmt(trip.pod_confirmed_at)],
+    ['Total Cartons', cartons.length || '—']
+  ].map(function(r){ return '<div class="pod-row"><span class="pod-label">' + r[0] + '</span><span class="pod-value">' + r[1] + '</span></div>'; }).join('');
+
+  if (cartons.length) {
+    document.getElementById('pod-cartons').style.display = 'block';
+    // Group by STO (barcode parts[1]), number per-group
+    var stoGroups = {}, stoOrder = [];
+    cartons.forEach(function(c) {
+      var parts = c.barcode ? c.barcode.split('|') : [];
+      var sto = parts.length >= 2 ? parts[1] : 'Unknown';
+      if (!stoGroups[sto]) { stoGroups[sto] = []; stoOrder.push(sto); }
+      stoGroups[sto].push(c);
+    });
+    var html = '';
+    stoOrder.forEach(function(sto) {
+      var grp = stoGroups[sto];
+      html += '<div style="font-size:.68rem;font-weight:800;color:var(--muted);padding:.3rem 0 .15rem;letter-spacing:.05em">' + sto + ' (' + grp.length + ')</div>';
+      grp.forEach(function(c, idx) {
+        var parts = c.barcode ? c.barcode.split('|') : [];
+        if (parts.length >= 3) parts[2] = (idx+1) + '/' + grp.length;
+        var displayBarcode = parts.length ? parts.join('|') : (c.barcode || '—');
+        html += '<div class="pod-carton-item">✅ ' + displayBarcode + '</div>';
+      });
+    });
+    document.getElementById('pod-carton-list').innerHTML = html;
+  }
+  // Show receiver name + signature if available
+  var sigCard = document.getElementById('pod-signature-card');
+  if (trip.signature_image) {
+    sigCard.style.display = 'block';
+    document.getElementById('pod-receiver-name').textContent = trip.receiver_name ? '👤 ' + trip.receiver_name : '';
+    document.getElementById('pod-signature-img').src = trip.signature_image;
+  } else {
+    sigCard.style.display = 'none';
+  }
+  document.getElementById('pod-sub').textContent = (trip.do_no || '') + ' — ' + (trip.destination || '');
+  // Store tripId for confirmDelivered(); hide action button in read-only (History) mode
+  // Show POD photo
+  var photoCard = document.getElementById('pod-photo-card');
+  var photoPreview = document.getElementById('pod-photo-preview');
+  var photoImg = document.getElementById('pod-photo-img');
+  var photoBtn = document.getElementById('pod-photo-btn');
+  if (readOnly) {
+    if (trip.pod_photo) {
+      photoCard.style.display = 'block';
+      photoPreview.style.display = 'block';
+      photoImg.src = trip.pod_photo;
+      photoBtn.style.display = 'none';
+    } else {
+      photoCard.style.display = 'none';
+    }
+  } else {
+    photoCard.style.display = 'block';
+    photoBtn.style.display = '';
+    if (trip.pod_photo) {
+      photoPreview.style.display = 'block';
+      photoImg.src = trip.pod_photo;
+    }
+  }
+
+  document.getElementById('screen-pod').setAttribute('data-trip-id', tripId);
+  document.getElementById('btn-delivered').style.display = readOnly ? 'none' : '';
+  showScreen('screen-pod');
+}
+
+// ── POD PHOTO CAPTURE ────────────────────────────
+var _podPhotoDataUrl = null;
+
+function onPodPhotoChosen(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _podPhotoDataUrl = e.target.result;
+    var img = document.getElementById('pod-photo-img');
+    img.src = _podPhotoDataUrl;
+    document.getElementById('pod-photo-preview').style.display = 'block';
+    document.getElementById('pod-photo-btn').textContent = '📷 Tukar Gambar';
+  };
+  reader.readAsDataURL(file);
+  // Reset input so same file can be chosen again
+  input.value = '';
+}
+
+function clearPodPhoto() {
+  _podPhotoDataUrl = null;
+  document.getElementById('pod-photo-img').src = '';
+  document.getElementById('pod-photo-preview').style.display = 'none';
+  document.getElementById('pod-photo-btn').textContent = '📷 Ambil Gambar';
+}
+
+function closePOD() { clearPodPhoto(); showScreen('screen-home'); if (_currentTab === 'delivery') renderDeliveryList(); }
+
+async function confirmDelivered() {
+  var tripId = document.getElementById('screen-pod').getAttribute('data-trip-id');
+  if (!tripId) { alert('Tiada trip ID.'); return; }
+  var btn = document.getElementById('btn-delivered');
+  btn.disabled = true; btn.textContent = '⏳ Menyimpan...';
+
+  try {
+    var update = { status: 'Delivered', pod_confirmed_at: new Date().toISOString() };
+    // Save photo if taken — try pod_photo column (add via Supabase if not yet: ALTER TABLE fleet_trips ADD COLUMN pod_photo text;)
+    if (_podPhotoDataUrl) update.pod_photo = _podPhotoDataUrl;
+    var { error } = await sb.from('fleet_trips').update(update).eq('id', tripId);
+    if (error) throw error;
+    // Mark stock_requests as Received
+    var { data: trip } = await sb.from('fleet_trips').select('do_no').eq('id', tripId).single();
+    if (trip && trip.do_no) {
+      await sb.from('stock_requests').update({ status: 'Received' }).eq('do_no', trip.do_no);
+      await sb.from('cartons').update({ status: 'delivered' }).eq('do_no', trip.do_no);
+    }
+    clearPodPhoto();
+    showScreen('screen-home');
+    loadTrip();
+  } catch(err) {
+    console.error('confirmDelivered error:', err);
+    alert('Ralat: ' + (err.message || err));
+    btn.disabled = false; btn.textContent = '✅ Delivered';
+  }
+}
+
+async function sharePOD() {
+  var btn = document.querySelector('#screen-pod .action-btn[onclick="sharePOD()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyediakan...'; }
+
+  try {
+    // Build a self-contained capture area
+    var captureEl = document.getElementById('pod-capture-area');
+    captureEl.innerHTML =
+      '<div style="background:#0f172a;padding:1.5rem;font-family:-apple-system,sans-serif;border-radius:12px;color:#f1f5f9">'
+      + '<div style="text-align:center;margin-bottom:1rem">'
+        + '<div style="font-size:2.5rem">✅</div>'
+        + '<div style="font-size:1.1rem;font-weight:800;color:#10b981">Delivery Confirmed</div>'
+        + '<div style="font-size:.75rem;color:#94a3b8;margin-top:.2rem">' + (document.getElementById('pod-sub').textContent || '') + '</div>'
+      + '</div>'
+      + document.getElementById('pod-details').outerHTML
+      + (document.getElementById('pod-signature-card').style.display !== 'none'
+          ? document.getElementById('pod-signature-card').outerHTML : '')
+      + (_podPhotoDataUrl
+          ? '<div style="margin-top:1rem"><div style="font-size:.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">📷 Gambar Bukti</div>'
+            + '<img src="' + _podPhotoDataUrl + '" style="width:100%;border-radius:8px;display:block;object-fit:cover;max-height:260px"/></div>'
+          : '')
+      + '<div style="text-align:center;font-size:.65rem;color:#475569;margin-top:1rem;border-top:1px solid #1e293b;padding-top:.75rem">Generated by KHATAM Fleet System · ' + new Date().toLocaleString('en-MY') + '</div>'
+      + '</div>';
+
+    var canvas = await html2canvas(captureEl, {
+      backgroundColor: '#0f172a',
+      scale: 2,
+      useCORS: true,
+      logging: false
+    });
+    captureEl.innerHTML = '';  // clean up
+
+    canvas.toBlob(async function(blob) {
+      var doNo = (document.getElementById('pod-sub').textContent || 'POD').split('—')[0].trim().replace(/[^a-z0-9-]/gi,'_');
+      var filename = 'POD_' + doNo + '_' + Date.now() + '.png';
+
+      // Try Web Share API (mobile)
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
+        await navigator.share({
+          title: 'Proof of Delivery — ' + doNo,
+          files: [new File([blob], filename, { type: 'image/png' })]
+        });
+      } else {
+        // Fallback: download
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+      }
+      if (btn) { btn.disabled = false; btn.textContent = '📤 Share / Simpan POD'; }
+    }, 'image/png');
+
+  } catch(err) {
+    console.error('sharePOD error:', err);
+    alert('Gagal menyediakan gambar POD.');
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Share / Simpan POD'; }
+  }
+}
+
+// ── GPS ──────────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) return;
+  stopGPS();
+  sendLocation();
+  _gpsInterval = setInterval(sendLocation, 30000);
+}
+function stopGPS() {
+  if (_gpsInterval) { clearInterval(_gpsInterval); _gpsInterval = null; }
+  const el = document.getElementById('gps-status');
+  if (el) { el.textContent = t('gpsOff'); el.className = 'gps-off'; }
+}
+async function sendLocation() {
+  if (!_trip) return;
+  navigator.geolocation.getCurrentPosition(async function(pos){
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    const el = document.getElementById('gps-status');
+    const { error } = await sb.from('fleet_trips')
+      .update({ lat, lng, last_location_update: new Date().toISOString() })
+      .eq('id', _trip.id);
+    if (error) {
+      console.error('GPS update failed:', error.message, 'trip id:', _trip.id);
+      if (el) { el.textContent = '⚠️ GPS Error: ' + error.message; el.className = 'gps-off'; }
+    } else {
+      if (el) { el.textContent = '📡 GPS Active · ' + lat.toFixed(5) + ',' + lng.toFixed(5); el.className = 'gps-on'; }
+      updateDriverMapPin(lat, lng);
+    }
+  }, function(err){
+    const el = document.getElementById('gps-status');
+    if (el) { el.textContent = '⚠️ GPS: ' + err.message; el.className = 'gps-off'; }
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// ── MAP ──────────────────────────────────────────
+function initDriverMap() {
+  if (!_driverMap) {
+    _driverMap = L.map('trip-map', { zoomControl:false, attributionControl:false }).setView([3.1390,101.6869],13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_driverMap);
+  }
+  setTimeout(function(){ if (_driverMap) _driverMap.invalidateSize(); }, 150);
+}
+async function updateDriverMapPin(lat, lng) {
+  if (!_driverMap) return;
+
+  // Driver pin (blue pulsing)
+  const driverIcon = L.divIcon({ className:'', html:'<div style="width:16px;height:16px;background:#6366f1;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.5);animation:pulse 2s infinite"></div>', iconSize:[16,16], iconAnchor:[8,8] });
+  if (_driverMarker) { _driverMarker.setLatLng([lat,lng]); }
+  else { _driverMarker = L.marker([lat,lng],{icon:driverIcon}).addTo(_driverMap); }
+
+  // Destination pin (green flag)
+  if (_destCoords) {
+    const destIcon = L.divIcon({ className:'', html:'<div style="width:14px;height:14px;background:#10b981;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.4)"></div>', iconSize:[14,14], iconAnchor:[7,7] });
+    if (_destMarker) { _destMarker.setLatLng([_destCoords.lat, _destCoords.lng]); }
+    else { _destMarker = L.marker([_destCoords.lat, _destCoords.lng], {icon:destIcon}).addTo(_driverMap).bindPopup('<b>🏁 ' + (_trip ? _trip.destination : 'Destination') + '</b>'); }
+
+    // Draw/update road route
+    const coords = await fetchOSRMRoute(lat, lng, _destCoords.lat, _destCoords.lng);
+    if (coords) {
+      if (_routeLine) { _driverMap.removeLayer(_routeLine); }
+      _routeLine = L.polyline(coords, { color:'#6366f1', weight:5, opacity:0.8, dashArray:'10,6' }).addTo(_driverMap);
+    }
+
+    // Fit map to show both driver + destination
+    _driverMap.fitBounds(L.latLngBounds([[lat,lng],[_destCoords.lat,_destCoords.lng]]).pad(0.25));
+  } else {
+    _driverMap.setView([lat,lng],15);
+  }
+}
+
+// ── RECENT TRIPS ─────────────────────────────────
+async function loadRecentTrips() {
+  const content = document.getElementById('trip-content');
+  const { data } = await sb.from('fleet_trips')
+    .select('do_no,destination,status,arrival_time')
+    .eq('driver_id',_driver.id).in('status',['Arrived','Cancelled'])
+    .order('created_at',{ascending:false}).limit(5);
+  if (!data || !data.length) return;
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:.8rem;font-weight:700;color:var(--muted);margin:.75rem 0 .5rem;width:100%;max-width:420px';
+  title.textContent = t('recentTrips');
+  content.appendChild(title);
+  data.forEach(function(trip){
+    const card = document.createElement('div'); card.className = 'history-card';
+    const time = trip.arrival_time ? new Date(trip.arrival_time).toLocaleString('en-MY',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+    card.innerHTML = '<div class="history-do">' + (trip.do_no||'—') + '</div><div class="history-dest">' + (trip.destination||'—') + '</div><div class="history-time">' + time + '</div>';
+    content.appendChild(card);
+  });
+}
+
+// ── INIT ─────────────────────────────────────────
+function hideSplash() {
+  const s = document.getElementById('splash');
+  if (s) s.style.display = 'none';
+}
+
+window.addEventListener('DOMContentLoaded', function(){
+  setLang(_lang);
+  const saved = localStorage.getItem('driver_session');
+  if (saved) {
+    try {
+      const s = JSON.parse(saved);
+      sb.from('fleet_drivers').select('*').eq('id', s.id).single().then(function(res){
+        if (res.data) {
+          _driver = res.data;
+          showHome();
+        } else {
+          localStorage.removeItem('driver_session');
+          showScreen('screen-login');
+        }
+        hideSplash();
+      }).catch(function(){
+        showScreen('screen-login');
+        hideSplash();
+      });
+    } catch(e){
+      showScreen('screen-login');
+      hideSplash();
+    }
+  } else {
+    showScreen('screen-login');
+    hideSplash();
+  }
+  document.getElementById('inp-pass').addEventListener('keydown', function(e){ if (e.key==='Enter') doLogin(); });
+});
+
+// ── PWA: Service Worker + Install Prompt ─────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(function(){});
+}
+var _pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  _pwaPrompt = e;
+  var btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = 'block';
+});
+function installPWA() {
+  if (!_pwaPrompt) return;
+  _pwaPrompt.prompt();
+  _pwaPrompt.userChoice.then(function(){ _pwaPrompt = null; document.getElementById('pwa-install-btn').style.display = 'none'; });
+}
+</script>
+<div id="pwa-install-btn" style="display:none;position:fixed;bottom:1.5rem;right:1rem;z-index:9999">
+  <button onclick="installPWA()" style="padding:.6rem 1.1rem;background:#6366f1;color:#fff;border:none;border-radius:20px;font-size:.82rem;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(99,102,241,.4)">📲 Install App</button>
+</div>
+</body>
+</html>
