@@ -42,7 +42,7 @@ jobs:
           BUBBLEWRAP_KEY_PASSWORD: khatam123
 
       - name: Upload Driver APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: fleet-driver-apk
           path: driver/app-release-signed.apk
@@ -83,7 +83,7 @@ jobs:
           BUBBLEWRAP_KEY_PASSWORD: khatam123
 
       - name: Upload Receive APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: khatam-receive-apk
           path: receive/app-release-signed.apk
