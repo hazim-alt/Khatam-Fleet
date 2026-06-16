@@ -103,7 +103,7 @@ jobs:
                   android:icon="@mipmap/ic_launcher"
                   android:theme="@android:style/Theme.NoTitleBar">
                   <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
-                      <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://khatam-apps.hazim-e70.workers.dev/driver-app.html"/>
+                      <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://hazim-alt.github.io/Khatam-Fleet/driver-app.html"/>
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
@@ -237,7 +237,7 @@ jobs:
                   android:icon="@mipmap/ic_launcher"
                   android:theme="@android:style/Theme.NoTitleBar">
                   <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
-                      <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://khatam-apps.hazim-e70.workers.dev/receive-app.html"/>
+                      <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://hazim-alt.github.io/Khatam-Fleet/receive-app.html"/>
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
