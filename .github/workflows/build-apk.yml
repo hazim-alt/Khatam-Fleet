@@ -18,13 +18,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Generate keystore
+      - name: Restore keystore
         run: |
           mkdir -p build-driver
-          keytool -genkey -v -keystore build-driver/android.keystore \
-            -alias khatam -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Khatam Fleet, OU=IT, O=Khatam, L=KL, S=KL, C=MY" \
-            -storepass khatam123 -keypass khatam123
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > build-driver/android.keystore
 
       - name: Print keystore fingerprint
         run: |
@@ -152,13 +149,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Generate keystore
+      - name: Restore keystore
         run: |
           mkdir -p build-receive
-          keytool -genkey -v -keystore build-receive/android.keystore \
-            -alias khatam -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Khatam Receive, OU=IT, O=Khatam, L=KL, S=KL, C=MY" \
-            -storepass khatam123 -keypass khatam123
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > build-receive/android.keystore
 
       - name: Print keystore fingerprint
         run: |
