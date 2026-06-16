@@ -1,0 +1,40 @@
+{
+  "packageId": "com.khatam.receive",
+  "host": "khatam-apps.hazim-e70.workers.dev",
+  "name": "Khatam Receive",
+  "launcherName": "Khatam Receive",
+  "display": "standalone",
+  "themeColor": "#0f172a",
+  "navigationColor": "#0f172a",
+  "navigationColorDark": "#0f172a",
+  "navigationDividerColor": "#0f172a",
+  "navigationDividerColorDark": "#0f172a",
+  "backgroundColor": "#0f172a",
+  "enableNotifications": false,
+  "startUrl": "/receive-app.html",
+  "iconUrl": "https://khatam-apps.hazim-e70.workers.dev/khatam-icon-512.png",
+  "maskableIconUrl": "https://khatam-apps.hazim-e70.workers.dev/khatam-icon-512.png",
+  "monochromeIconUrl": "https://khatam-apps.hazim-e70.workers.dev/khatam-icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "khatam"
+  },
+  "appVersionCode": 1,
+  "appVersionName": "1.0.0",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://khatam-apps.hazim-e70.workers.dev/receive-manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": { "enabled": true },
+    "playBilling": { "enabled": false }
+  },
+  "alphaDependencies": { "enabled": false },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}
