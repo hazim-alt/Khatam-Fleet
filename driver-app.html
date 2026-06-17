@@ -1097,6 +1097,36 @@ async function doDepart() {
   startGPS();
 }
 
+// ── LEG 2: OPEN SCAN FROM DELIVERY TAB ───────────
+function openScanForTrip(tripId) {
+  const trip = _allTrips.find(function(t){ return t.id === tripId; });
+  if (!trip) return;
+  _trip = trip;
+  openScan();
+}
+
+// ── LEG 2: DEPART WITHOUT SCAN (SKIP) ────────────
+async function departTrip(tripId) {
+  if (!confirm('Depart without scanning cartons?')) return;
+  const trip = _allTrips.find(function(t){ return t.id === tripId; });
+  if (!trip) return;
+  _trip = trip;
+  const { error } = await sb.from('fleet_trips').update({ status:'Departed', departure_time: new Date().toISOString() }).eq('id', tripId);
+  if (error) { alert(error.message); return; }
+  if (trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', trip.do_no);
+    if (reqs && reqs.length) {
+      const reqIds = reqs.map(function(r){ return r.id; });
+      const logNote = 'Driver departed (leg 2) | Driver: ' + _driver.name + ' | DO: ' + trip.do_no;
+      await Promise.all(reqIds.map(function(id) {
+        return sb.from('request_status_log').insert({ request_id: id, status: 'In Transit', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  startGPS();
+  loadTrip();
+}
+
 // ── DROP AT WAREHOUSE ────────────────────────────
 async function doDropWarehouse() {
   if (!_trip) return;
@@ -1469,13 +1499,24 @@ function buildDeliveryItem(trip, idx) {
   item.draggable = !isArrived;
 
   let statusText = '🚚 In Transit';
-  // leg 1 = pick-up driver (warehouse drop only); leg 2 = delivery driver (mark arrived at boutique)
-  let actionHTML = trip.leg === 1
-    ? '<div style="display:flex;flex-direction:column;gap:.4rem">'
+  let actionHTML;
+  if (trip.leg === 1) {
+    // Leg 1 departed: drop at warehouse or direct delivery
+    actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
       + '<button class="btn-arrived-sm" style="background:#3b82f6" onclick="markDropWarehouse(\'' + trip.id + '\',\'' + (trip.vehicle_id||'') + '\')">🏭 Drop at Warehouse</button>'
       + '<button class="btn-arrived-sm" style="background:#10b981" onclick="markDirectDelivery(\'' + trip.id + '\')">🏪 Direct Delivery</button>'
-      + '</div>'
-    : '<button class="btn-arrived-sm" onclick="markArrived(\'' + trip.id + '\')">📍 Mark as Arrived</button>';
+      + '</div>';
+  } else if (trip.status === 'Assigned') {
+    // Leg 2 assigned: must scan cartons at warehouse first, then depart
+    statusText = '📋 Assigned — Scan cartons to depart';
+    actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
+      + '<button class="btn-arrived-sm" style="background:#6366f1" onclick="openScanForTrip(\'' + trip.id + '\')">📦 Scan Cartons</button>'
+      + '<button class="btn-arrived-sm" style="background:#f59e0b;color:#000" onclick="departTrip(\'' + trip.id + '\')">🚀 Depart (Skip Scan)</button>'
+      + '</div>';
+  } else {
+    // Leg 2 departed: mark arrived
+    actionHTML = '<button class="btn-arrived-sm" onclick="markArrived(\'' + trip.id + '\')">📍 Mark as Arrived</button>';
+  }
   if (isPOD) {
     statusText = '✅ POD Confirmed';
     actionHTML = '<button class="btn-pod" onclick="viewPOD(\'' + trip.id + '\')">📄 View POD</button>';
