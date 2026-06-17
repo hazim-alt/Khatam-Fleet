@@ -1361,6 +1361,11 @@ function initPickupDragDrop() {
 async function reorderPickup(fromIdx, toIdx) {
   var moved = _pickupTrips.splice(fromIdx, 1)[0];
   _pickupTrips.splice(toIdx, 0, moved);
+  _pickupTrips.forEach(function(t, i){
+    t.driver_sequence = i;
+    var at = _allTrips.find(function(x){ return x.id === t.id; });
+    if (at) at.driver_sequence = i;
+  });
   await Promise.all(_pickupTrips.map(function(t, i){ return sb.from('fleet_trips').update({ driver_sequence: i }).eq('id', t.id); }));
   renderPickupList();
 }
@@ -1616,6 +1621,12 @@ function initDragDrop() {
 async function reorderDelivery(fromIdx, toIdx) {
   var moved = _deliveryTrips.splice(fromIdx, 1)[0];
   _deliveryTrips.splice(toIdx, 0, moved);
+  // Update driver_sequence in _allTrips memory so renderDeliveryList sorts correctly
+  _deliveryTrips.forEach(function(t, i){
+    t.driver_sequence = i;
+    var at = _allTrips.find(function(x){ return x.id === t.id; });
+    if (at) at.driver_sequence = i;
+  });
   await Promise.all(_deliveryTrips.map(function(t, i){ return sb.from('fleet_trips').update({ driver_sequence: i }).eq('id', t.id); }));
   renderDeliveryList();
 }
