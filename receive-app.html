@@ -116,6 +116,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .scan-footer{position:fixed;bottom:0;left:0;right:0;padding:.75rem 1rem;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.4rem}
 .btn-confirm-receive{width:100%;padding:.85rem;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;opacity:.4;pointer-events:none;transition:opacity .2s}
 .btn-confirm-receive.ready{opacity:1;pointer-events:auto}
+.btn-skip-scan{width:100%;padding:.6rem;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:.82rem;font-weight:600;cursor:pointer}
 .scan-manual-row{display:flex;gap:.5rem}
 .scan-manual-row input{flex:1;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none}
 .scan-manual-row input:focus{border-color:var(--accent)}
@@ -240,6 +241,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 
   <div class="scan-footer">
     <button class="btn-confirm-receive" id="confirm-btn" onclick="openSignatureModal()">✅ Sahkan Penerimaan</button>
+    <button class="btn-skip-scan" onclick="openSignatureModal(true)">⏭️ Langkau Scan</button>
     <div class="scan-manual-row">
       <input type="text" id="manual-input" placeholder="Input manual / external scanner..." inputmode="none" autocomplete="off" autocorrect="off"/>
       <button onclick="addManualScan()">OK</button>
@@ -972,8 +974,15 @@ function addScanItem(barcode, type, note) {
 let _sigDrawing = false;
 let _sigHasSig = false;
 
-function openSignatureModal() {
-  if (!_scans.length || !_currentDelivery) return;
+function openSignatureModal(skipScan) {
+  if (!_currentDelivery && !_batchDeliveries.length) return;
+  // Update title for batch vs single
+  var titleEl = document.querySelector('.sig-title');
+  if (titleEl) {
+    titleEl.textContent = _batchDeliveries.length > 1
+      ? '✍️ Terima ' + _batchDeliveries.length + ' Order'
+      : '✍️ Pengesahan Penerimaan';
+  }
   document.getElementById('sig-modal').style.display = 'flex';
   document.getElementById('sig-name').value = '';
   // Init canvas after it's visible
@@ -1066,26 +1075,11 @@ async function startBatchReceive() {
   });
   if (!selected.length) return;
 
-  // Use the same POD screen — store batch in _batchDeliveries
   _batchDeliveries = selected;
-  _currentDelivery = selected[0]; // primary (for scan screen)
+  _currentDelivery = selected[0];
   _scans = [];
-
-  // Show receiver name prompt directly (skip per-order carton scan for batch)
-  var overlay = document.createElement('div');
-  overlay.id = 'batch-name-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
-  overlay.innerHTML = '<div style="background:#1e293b;border-radius:16px;padding:1.5rem;width:100%;max-width:380px;color:#f1f5f9">'
-    + '<div style="font-weight:800;font-size:1rem;margin-bottom:.3rem">📥 Terima ' + selected.length + ' Order</div>'
-    + '<div style="font-size:.78rem;color:#94a3b8;margin-bottom:1rem">' + selected.map(function(s){ return s.doNo || s.batchNo; }).join(', ') + '</div>'
-    + '<label style="font-size:.8rem;color:#94a3b8;display:block;margin-bottom:.3rem">Nama Penerima</label>'
-    + '<input id="batch-receiver-name" type="text" placeholder="Nama penerima..." style="width:100%;padding:.6rem .8rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:.9rem;box-sizing:border-box;margin-bottom:1rem">'
-    + '<div style="display:flex;gap:.6rem">'
-    + '<button onclick="document.getElementById(\'batch-name-overlay\').remove()" style="flex:1;padding:.6rem;background:transparent;border:1px solid #334155;border-radius:8px;color:#94a3b8;cursor:pointer">Batal</button>'
-    + '<button onclick="confirmBatchReceive()" style="flex:2;padding:.6rem;background:#10b981;border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">✅ Sahkan Terima</button>'
-    + '</div></div>';
-  document.body.appendChild(overlay);
-  setTimeout(function(){ document.getElementById('batch-receiver-name').focus(); }, 100);
+  // Open signature modal directly — skip carton scan for batch
+  openSignatureModal(true);
 }
 
 var _batchDeliveries = [];
@@ -1135,12 +1129,50 @@ async function confirmBatchReceive() {
 }
 
 async function confirmReceive(receiverName, signatureImage) {
-  if (!_scans.length || !_currentDelivery) return;
-  var btn = document.getElementById('confirm-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Memproses...';
-
+  if (!_currentDelivery && !_batchDeliveries.length) return;
   var who = _user ? (_user.full_name || _user.username) : 'Staff';
+  var now = new Date().toISOString();
+
+  // ── BATCH MODE ─────────────────────────────────────
+  if (_batchDeliveries.length > 1) {
+    var bar = document.getElementById('batch-receive-bar');
+    if (bar) bar.remove();
+    try {
+      for (var bi = 0; bi < _batchDeliveries.length; bi++) {
+        var bdel = _batchDeliveries[bi];
+        var bIds = bdel.ids || [];
+        if (!bIds.length && bdel.doNo) {
+          var { data: bReqs } = await sb.from('stock_requests').select('id').eq('do_no', bdel.doNo);
+          bIds = (bReqs || []).map(function(r){ return r.id; });
+        }
+        if (bIds.length) {
+          await sb.from('stock_requests').update({ status: 'Received' }).in('id', bIds);
+          await Promise.all(bIds.map(function(id){
+            var note = 'Penerimaan batch | DO: ' + (bdel.doNo || bdel.batchNo) + ' | Diterima oleh: ' + (receiverName || who);
+            return sb.from('request_status_log').insert({ request_id: id, status: 'Received', note: note, changed_by: who });
+          }));
+        }
+        var bPod = { status: 'Arrived', pod_confirmed_at: now, pod_confirmed_by: who, receiver_name: receiverName || null, signature_image: signatureImage || null };
+        if (bdel.tripId) {
+          await sb.from('fleet_trips').update(bPod).eq('id', bdel.tripId);
+        } else if (bdel.doNo) {
+          await sb.from('fleet_trips').update(bPod).eq('do_no', bdel.doNo);
+        }
+      }
+      showToast('✅ ' + _batchDeliveries.length + ' order berjaya diterima!', 3000);
+      _batchDeliveries = [];
+      setTimeout(function(){ stopScanner(); showScreen('screen-home'); loadDeliveries(); }, 1500);
+    } catch(err) {
+      console.error(err);
+      showToast('❌ Ralat! Cuba lagi.', 3000);
+    }
+    return;
+  }
+
+  // ── SINGLE MODE ────────────────────────────────────
+  var btn = document.getElementById('confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Memproses...'; }
+
   var ids  = _currentDelivery.ids || [];
   var doNo = _currentDelivery.doNo || '—';
 
