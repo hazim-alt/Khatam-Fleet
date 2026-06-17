@@ -555,6 +555,19 @@ async function loadDeliveries() {
     return;
   }
 
+  // ── 2b. Fill in missing fromName for fleet_trips fallback groups
+  var missingFromDOs = Object.values(groups).filter(function(g){ return g.fromName === '—' && g.doNo; }).map(function(g){ return g.doNo; });
+  if (missingFromDOs.length) {
+    var { data: srcReqs } = await sb.from('stock_requests')
+      .select('do_no, fulfiller:to_boutique_id(name)')
+      .in('do_no', missingFromDOs);
+    var doSrcMap = {};
+    (srcReqs || []).forEach(function(r){ if (r.do_no && r.fulfiller) doSrcMap[r.do_no] = r.fulfiller.name; });
+    Object.values(groups).forEach(function(g){
+      if (g.fromName === '—' && g.doNo && doSrcMap[g.doNo]) g.fromName = doSrcMap[g.doNo];
+    });
+  }
+
   // ── 3. Get carton counts — count rows (1 row = 1 carton), no status filter
   var allDOs     = Object.values(groups).map(function(g){ return g.doNo; }).filter(Boolean);
   var allBatches = Object.values(groups).map(function(g){ return !g.doNo && g.batchNo ? g.batchNo : null; }).filter(Boolean);
@@ -598,39 +611,57 @@ async function loadDeliveries() {
   // ── 4. Render
   var html = '';
   var destName = boutiqueName || '—';
+  var hasArrived = Object.values(groups).some(function(g){ return !!g.isArrived; });
+
+  // "Pilih Semua" header if there are arrived orders
+  if (hasArrived) {
+    html += '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;max-width:420px;width:100%">'
+      + '<label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--muted);cursor:pointer">'
+      + '<input type="checkbox" id="chk-all" onchange="toggleSelectAll(this.checked)" style="width:16px;height:16px;cursor:pointer"> Pilih Semua'
+      + '</label></div>';
+  }
+
   Object.keys(groups).forEach(function(key) {
     var g = groups[key];
     var count = cartonMap[g.doNo] || cartonMap[g.batchNo] || 0;
     var payload = { doNo: g.doNo, batchNo: g.batchNo, fromName: g.fromName, ids: g.ids, expectedCartons: count, tripId: g.tripId || null };
     var isArrived = !!g.isArrived;
     var sourceLabel = g.fromName && g.fromName !== '—' ? g.fromName : null;
-    // meta line: driver · plat · items
     var metaParts = [];
     if (g.driverName) metaParts.push('Pemandu: ' + g.driverName);
     if (g.platNo)     metaParts.push('🚗 ' + g.platNo);
     if (g.ids.length) metaParts.push(g.ids.length + ' item');
-    html += '<div class="delivery-card">'
+    var payloadStr = JSON.stringify(payload).replace(/'/g, '&#39;');
+    html += '<div class="delivery-card" data-payload=\'' + payloadStr + '\' data-arrived="' + (isArrived ? '1' : '0') + '">'
+      + '<div style="display:flex;align-items:flex-start;gap:.6rem">'
+      + (isArrived ? '<input type="checkbox" class="order-chk" onchange="updateBatchBtn()" style="width:18px;height:18px;margin-top:.2rem;cursor:pointer;flex-shrink:0">' : '<div style="width:18px;flex-shrink:0"></div>')
+      + '<div style="flex:1">'
       // Status badge
       + '<div class="dc-status ' + (isArrived ? 'arrived' : 'transit') + '">'
         + (isArrived ? '📍 Driver Tiba' : '🚚 Dalam Perjalanan')
       + '</div>'
-      // DO number
       + '<div class="dc-do">' + (g.doNo || g.batchNo || 'Trip #' + (g.tripId || '—')) + '</div>'
-      // Route: source → destination (only if source is meaningful)
-      + (sourceLabel
-          ? '<div class="dc-route"><div class="dc-route-from">' + sourceLabel + '</div><div class="dc-route-arrow">→</div><div class="dc-route-to">' + destName + '</div></div>'
-          : '<div class="dc-route"><div class="dc-route-to" style="text-align:left">→ ' + destName + '</div></div>')
-      // Driver, plate & items
+      + '<div class="dc-route"><div class="dc-route-from">' + (sourceLabel || '—') + '</div><div class="dc-route-arrow">→</div><div class="dc-route-to">' + destName + '</div></div>'
       + (metaParts.length ? '<div class="dc-meta">' + metaParts.join(' · ') + '</div>' : '')
-      // Carton badge
       + (count > 0
           ? '<div class="dc-carton has">📦 ' + count + ' karton dijangka</div>'
           : '<div class="dc-carton none">📦 Tiada karton didaftarkan</div>')
       + '<button class="btn-receive" onclick=\'startReceive(' + JSON.stringify(payload) + ')\'>📥 Mula Terima</button>'
-      + '</div>';
+      + '</div></div></div>';
   });
   html += '<button class="refresh-btn" style="width:100%;max-width:420px;margin-top:.25rem" onclick="loadDeliveries()">🔄 Muat Semula</button>';
   el.innerHTML = html;
+
+  // Floating batch receive button
+  var existing = document.getElementById('batch-receive-bar');
+  if (existing) existing.remove();
+  if (hasArrived) {
+    var bar = document.createElement('div');
+    bar.id = 'batch-receive-bar';
+    bar.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:999;display:none;animation:fadeIn .2s';
+    bar.innerHTML = '<button id="batch-receive-btn" onclick="startBatchReceive()" style="padding:.75rem 2rem;background:#10b981;color:#fff;border:none;border-radius:14px;font-size:.95rem;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(16,185,129,.4)">📥 Terima Dipilih (<span id="batch-count">0</span>)</button>';
+    document.body.appendChild(bar);
+  }
 }
 
 // ── START RECEIVING ───────────────────────────────
@@ -1008,6 +1039,101 @@ async function submitSignature() {
 }
 
 // ── CONFIRM RECEIVE ───────────────────────────────
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.order-chk').forEach(function(chk){ chk.checked = checked; });
+  updateBatchBtn();
+}
+
+function updateBatchBtn() {
+  var checked = document.querySelectorAll('.order-chk:checked').length;
+  var bar = document.getElementById('batch-receive-bar');
+  var cnt = document.getElementById('batch-count');
+  if (bar) bar.style.display = checked > 0 ? 'block' : 'none';
+  if (cnt) cnt.textContent = checked;
+  // Sync "pilih semua" checkbox
+  var all = document.querySelectorAll('.order-chk').length;
+  var chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.checked = checked === all && all > 0;
+}
+
+async function startBatchReceive() {
+  var selected = [];
+  document.querySelectorAll('.order-chk:checked').forEach(function(chk){
+    var card = chk.closest('.delivery-card');
+    if (card) {
+      try { selected.push(JSON.parse(card.getAttribute('data-payload').replace(/&#39;/g, "'"))); } catch(e){}
+    }
+  });
+  if (!selected.length) return;
+
+  // Use the same POD screen — store batch in _batchDeliveries
+  _batchDeliveries = selected;
+  _currentDelivery = selected[0]; // primary (for scan screen)
+  _scans = [];
+
+  // Show receiver name prompt directly (skip per-order carton scan for batch)
+  var overlay = document.createElement('div');
+  overlay.id = 'batch-name-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
+  overlay.innerHTML = '<div style="background:#1e293b;border-radius:16px;padding:1.5rem;width:100%;max-width:380px;color:#f1f5f9">'
+    + '<div style="font-weight:800;font-size:1rem;margin-bottom:.3rem">📥 Terima ' + selected.length + ' Order</div>'
+    + '<div style="font-size:.78rem;color:#94a3b8;margin-bottom:1rem">' + selected.map(function(s){ return s.doNo || s.batchNo; }).join(', ') + '</div>'
+    + '<label style="font-size:.8rem;color:#94a3b8;display:block;margin-bottom:.3rem">Nama Penerima</label>'
+    + '<input id="batch-receiver-name" type="text" placeholder="Nama penerima..." style="width:100%;padding:.6rem .8rem;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:.9rem;box-sizing:border-box;margin-bottom:1rem">'
+    + '<div style="display:flex;gap:.6rem">'
+    + '<button onclick="document.getElementById(\'batch-name-overlay\').remove()" style="flex:1;padding:.6rem;background:transparent;border:1px solid #334155;border-radius:8px;color:#94a3b8;cursor:pointer">Batal</button>'
+    + '<button onclick="confirmBatchReceive()" style="flex:2;padding:.6rem;background:#10b981;border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">✅ Sahkan Terima</button>'
+    + '</div></div>';
+  document.body.appendChild(overlay);
+  setTimeout(function(){ document.getElementById('batch-receiver-name').focus(); }, 100);
+}
+
+var _batchDeliveries = [];
+
+async function confirmBatchReceive() {
+  var name = (document.getElementById('batch-receiver-name').value || '').trim();
+  if (!name) { alert('Sila masukkan nama penerima.'); return; }
+  var btn = document.querySelector('#batch-name-overlay button:last-child');
+  btn.disabled = true; btn.textContent = '⏳ Memproses...';
+
+  var who = _user ? (_user.full_name || _user.username) : 'Staff';
+  var now = new Date().toISOString();
+
+  try {
+    for (var i = 0; i < _batchDeliveries.length; i++) {
+      var delivery = _batchDeliveries[i];
+      var reqIds = delivery.ids || [];
+      if (!reqIds.length && delivery.doNo) {
+        var { data: foundReqs } = await sb.from('stock_requests').select('id').eq('do_no', delivery.doNo);
+        reqIds = (foundReqs || []).map(function(r){ return r.id; });
+      }
+      if (reqIds.length) {
+        await sb.from('stock_requests').update({ status: 'Received' }).in('id', reqIds);
+        await Promise.all(reqIds.map(function(id){
+          var note = 'Penerimaan batch | DO: ' + (delivery.doNo || delivery.batchNo) + ' | Diterima oleh: ' + name;
+          return sb.from('request_status_log').insert({ request_id: id, status: 'Received', note: note, changed_by: who });
+        }));
+      }
+      var podUpdate = { status: 'Arrived', pod_confirmed_at: now, pod_confirmed_by: who, receiver_name: name };
+      if (delivery.tripId) {
+        await sb.from('fleet_trips').update(podUpdate).eq('id', delivery.tripId);
+      } else if (delivery.doNo) {
+        await sb.from('fleet_trips').update(podUpdate).eq('do_no', delivery.doNo);
+      }
+    }
+    document.getElementById('batch-name-overlay').remove();
+    var bar = document.getElementById('batch-receive-bar');
+    if (bar) bar.remove();
+    showToast('✅ ' + _batchDeliveries.length + ' order berjaya diterima!', 3000);
+    _batchDeliveries = [];
+    setTimeout(loadDeliveries, 1500);
+  } catch(err) {
+    console.error(err);
+    showToast('❌ Ralat! Cuba lagi.', 3000);
+    btn.disabled = false; btn.textContent = '✅ Sahkan Terima';
+  }
+}
+
 async function confirmReceive(receiverName, signatureImage) {
   if (!_scans.length || !_currentDelivery) return;
   var btn = document.getElementById('confirm-btn');
