@@ -127,7 +127,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .toast.show{opacity:1}
 
 /* SIGNATURE MODAL */
-.sig-modal{position:fixed;inset:0;background:rgba(15,23,42,.92);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.sig-modal{position:fixed;inset:0;background:rgba(15,23,42,.92);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
 .sig-sheet{background:var(--card);border-radius:20px 20px 0 0;padding:1.25rem 1rem 2.5rem;width:100%;max-width:480px}
 .sig-title{font-size:1rem;font-weight:800;margin-bottom:.2rem}
 .sig-sub{font-size:.78rem;color:var(--muted);margin-bottom:1.1rem}
@@ -280,6 +280,7 @@ let _scanner = null;
 let _scans = [];          // received cartons this session
 let _currentDelivery = null;  // { doNo, batchNo, requestIds, expectedCartons, fromName }
 let _allCartons = [];     // registered cartons for current delivery
+var _cardPayloads = {};   // key → payload map for batch select (avoids JSON parse on mobile)
 
 // ── UTILS ────────────────────────────────────────
 function showScreen(id) {
@@ -623,18 +624,20 @@ async function loadDeliveries() {
       + '</label></div>';
   }
 
+  _cardPayloads = {}; // reset map each render
   Object.keys(groups).forEach(function(key) {
     var g = groups[key];
     var count = cartonMap[g.doNo] || cartonMap[g.batchNo] || 0;
     var payload = { doNo: g.doNo, batchNo: g.batchNo, fromName: g.fromName, ids: g.ids, expectedCartons: count, tripId: g.tripId || null };
+    var cardKey = g.doNo || g.batchNo || key;
+    _cardPayloads[cardKey] = payload; // store in global map
     var isArrived = !!g.isArrived;
     var sourceLabel = g.fromName && g.fromName !== '—' ? g.fromName : null;
     var metaParts = [];
     if (g.driverName) metaParts.push('Pemandu: ' + g.driverName);
     if (g.platNo)     metaParts.push('🚗 ' + g.platNo);
     if (g.ids.length) metaParts.push(g.ids.length + ' item');
-    var payloadStr = JSON.stringify(payload).replace(/'/g, '&#39;');
-    html += '<div class="delivery-card" data-payload=\'' + payloadStr + '\' data-arrived="' + (isArrived ? '1' : '0') + '">'
+    html += '<div class="delivery-card" data-key="' + cardKey + '" data-arrived="' + (isArrived ? '1' : '0') + '">'
       + '<div style="display:flex;align-items:flex-start;gap:.6rem">'
       + (isArrived ? '<input type="checkbox" class="order-chk" onchange="updateBatchBtn()" style="width:18px;height:18px;margin-top:.2rem;cursor:pointer;flex-shrink:0">' : '<div style="width:18px;flex-shrink:0"></div>')
       + '<div style="flex:1">'
@@ -1070,7 +1073,8 @@ async function startBatchReceive() {
   document.querySelectorAll('.order-chk:checked').forEach(function(chk){
     var card = chk.closest('.delivery-card');
     if (card) {
-      try { selected.push(JSON.parse(card.getAttribute('data-payload').replace(/&#39;/g, "'"))); } catch(e){}
+      var k = card.getAttribute('data-key');
+      if (k && _cardPayloads[k]) selected.push(_cardPayloads[k]);
     }
   });
   if (!selected.length) return;
@@ -1078,8 +1082,34 @@ async function startBatchReceive() {
   _batchDeliveries = selected;
   _currentDelivery = selected[0];
   _scans = [];
-  // Open signature modal directly — skip carton scan for batch
-  openSignatureModal(true);
+
+  // Fetch cartons from all selected DOs combined
+  var allDoNos = selected.filter(function(s){ return s.doNo; }).map(function(s){ return s.doNo; });
+  var allBatchNos = selected.filter(function(s){ return s.batchNo && !s.doNo; }).map(function(s){ return s.batchNo; });
+  _allCartons = [];
+  try {
+    if (allDoNos.length) {
+      var resDC = await sb.from('cartons').select('id,barcode,carton_no,total_cartons,do_no,batch_no').in('do_no', allDoNos);
+      _allCartons = _allCartons.concat(resDC.data || []);
+    }
+    if (allBatchNos.length) {
+      var resBC = await sb.from('cartons').select('id,barcode,carton_no,total_cartons,do_no,batch_no').in('batch_no', allBatchNos);
+      _allCartons = _allCartons.concat(resBC.data || []);
+    }
+  } catch(e) { console.error('batch carton fetch:', e); _allCartons = []; }
+
+  // Show scan screen
+  var label = selected.length + ' Order (' + selected.map(function(s){ return s.doNo || s.batchNo; }).join(', ') + ')';
+  document.getElementById('scan-do-label').textContent = label;
+  document.getElementById('scan-count').textContent = '0';
+  document.getElementById('scan-total').textContent = _allCartons.length || '?';
+  document.getElementById('scan-status-msg').textContent = '';
+  document.getElementById('confirm-btn').classList.remove('ready');
+  document.getElementById('manual-input').value = '';
+  showScreen('screen-scan');
+  renderReceiveScanList();
+  startScanner();
+  setTimeout(function(){ document.getElementById('manual-input').focus(); }, 800);
 }
 
 var _batchDeliveries = [];
