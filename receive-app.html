@@ -7,10 +7,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#0f172a"/>
-<link rel="manifest" href="receive-manifest.json"/>
-<link rel="apple-touch-icon" href="icon-receive-192.png"/>
-<title>Boutique Receive</title>
+<link rel="manifest" href="driver-manifest.json"/>
+<link rel="apple-touch-icon" href="icon-driver-192.png"/>
+<title>Fleet Driver</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -20,13 +23,17 @@
 }
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden}
 
+/* LANG BAR */
+#lang-bar{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;justify-content:flex-end;padding:.5rem .75rem;background:var(--bg);border-bottom:1px solid var(--border)}
+.lang-btn{padding:.25rem .6rem;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.72rem;cursor:pointer;font-weight:600}
+.lang-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
 /* SCREENS */
-.screen{display:none;padding:1.5rem 1rem 2rem;min-height:100vh;flex-direction:column;align-items:center}
+.screen{display:none;padding:4rem 1rem 2rem;min-height:100vh;flex-direction:column;align-items:center}
 .screen.active{display:flex}
 #screen-login.active{justify-content:center}
-#screen-boutique-pick.active{justify-content:center}
-#screen-home.active{justify-content:flex-start;padding-top:1.5rem}
-#screen-scan.active{justify-content:flex-start;padding:0;height:100vh;overflow:hidden}
+#screen-home.active{justify-content:flex-start;padding-top:4.5rem}
+#screen-scan.active{justify-content:flex-start;padding-top:4.5rem;padding-left:0;padding-right:0}
 
 /* LOGIN */
 .login-logo{font-size:3rem;margin-bottom:.5rem;text-align:center}
@@ -41,756 +48,737 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .btn-full{width:100%;padding:.85rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer}
 .btn-full:disabled{opacity:.5}
 
-/* BOUTIQUE PICKER */
-.picker-title{font-size:1.1rem;font-weight:800;margin-bottom:.25rem;text-align:center}
-.picker-sub{font-size:.8rem;color:var(--muted);margin-bottom:1.5rem;text-align:center}
-.picker-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:380px}
-.boutique-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:#0f172a;border:1px solid var(--border);border-radius:10px;margin-bottom:.6rem;cursor:pointer;transition:border-color .15s}
-.boutique-item:hover{border-color:var(--accent)}
-.boutique-item .b-name{font-size:.88rem;font-weight:600}
-.boutique-item .b-arrow{margin-left:auto;color:var(--muted);font-size:.9rem}
-
 /* HOME */
-.home-header{width:100%;max-width:420px;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
-.greet-name{font-size:.95rem;font-weight:700}
-.greet-boutique{font-size:.72rem;color:var(--accent);margin-top:.1rem}
+.driver-header{width:100%;max-width:420px;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.driver-greet{font-size:.95rem;font-weight:700}
+.driver-sub{font-size:.72rem;color:var(--muted)}
 .logout-btn{background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.72rem;padding:.3rem .65rem;cursor:pointer}
-.section-title{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;width:100%;max-width:420px}
-.delivery-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.1rem 1.25rem 1.25rem;width:100%;max-width:420px;margin-bottom:.75rem;position:relative}
-.dc-status{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .6rem;border-radius:20px;font-size:.68rem;font-weight:700;margin-bottom:.65rem}
-.dc-status.arrived{background:#10b98120;color:var(--green);border:1px solid #10b98140}
-.dc-status.transit{background:#3b82f620;color:var(--blue);border:1px solid #3b82f640}
-.dc-route{display:flex;align-items:center;gap:.4rem;margin-bottom:.5rem;flex-wrap:wrap}
-.dc-route-from{font-size:.78rem;font-weight:600;color:var(--muted);word-break:break-word}
-.dc-route-arrow{font-size:.7rem;color:var(--muted);flex-shrink:0}
-.dc-route-to{font-size:.78rem;font-weight:700;color:var(--text);word-break:break-word}
-.dc-do{font-size:.82rem;font-weight:800;font-family:monospace;color:var(--accent);margin-bottom:.3rem}
-.dc-meta{font-size:.7rem;color:var(--muted);margin-bottom:.85rem}
-.dc-carton{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:20px;font-size:.7rem;font-weight:700;margin-bottom:.85rem}
-.dc-carton.has{background:#6366f115;border:1px solid var(--accent);color:var(--accent)}
-.dc-carton.none{background:transparent;border:1px solid var(--border);color:var(--muted)}
-.btn-receive{width:100%;padding:.8rem;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;letter-spacing:.02em}
-.no-delivery{text-align:center;padding:3rem 1rem;color:var(--muted);width:100%;max-width:420px}
-.no-delivery .icon{font-size:3rem;margin-bottom:.75rem;opacity:.3}
-.refresh-btn{margin-top:1rem;padding:.55rem 1.2rem;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.8rem;cursor:pointer}
+.trip-tab{flex:1;padding:.6rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:.82rem;font-weight:700;cursor:pointer;transition:all .15s}
+.trip-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.trip-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.25rem;width:100%;max-width:420px;margin-bottom:1rem}
+.trip-badge{display:inline-block;padding:.25rem .75rem;border-radius:20px;font-size:.7rem;font-weight:700;margin-bottom:.75rem}
+.badge-assigned{background:#6366f120;color:var(--accent);border:1px solid var(--accent)}
+.badge-departed{background:#f59e0b20;color:var(--yellow);border:1px solid var(--yellow)}
+.badge-scanning{background:#3b82f620;color:var(--blue);border:1px solid var(--blue)}
+.trip-do{font-size:1rem;font-weight:800;font-family:monospace;color:var(--accent);margin-bottom:.25rem}
+.trip-dest{font-size:.9rem;font-weight:600;margin-bottom:.1rem}
+.trip-vehicle{font-size:.75rem;color:var(--muted);margin-bottom:.75rem}
+.action-btn{width:100%;max-width:420px;padding:.85rem;border:none;border-radius:12px;font-size:.95rem;font-weight:700;cursor:pointer;margin-top:.25rem}
+.btn-scan{background:var(--blue);color:#fff}
+.btn-start{background:var(--accent);color:#fff}
+.btn-arrived{background:var(--green);color:#fff}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.8rem;padding:.65rem;border-radius:10px;cursor:pointer;width:100%;max-width:420px;margin-top:.4rem}
 
-/* SCAN SCREEN */
-.scan-topbar{width:100%;background:var(--card);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem;position:sticky;top:0;z-index:10}
-.scan-back{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:.2rem}
-.scan-title{font-size:.9rem;font-weight:700;flex:1}
-.scan-do{font-size:.7rem;color:var(--accent);font-family:monospace}
+/* MAP */
+#trip-map-wrap{width:100%;max-width:420px;border-radius:14px;overflow:hidden;border:1px solid var(--border);margin-bottom:1rem}
+#trip-map{height:200px;width:100%}
+.map-label{background:var(--card);padding:.5rem .75rem;font-size:.72rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
+.gps-on{color:var(--green)} .gps-off{color:var(--red)}
 
-.camera-wrap{width:100%;position:relative;background:#000;overflow:hidden}
+/* NO TRIP */
+.no-trip{text-align:center;padding:2rem;color:var(--muted);width:100%;max-width:420px}
+.no-trip .icon{font-size:3rem;margin-bottom:.75rem;opacity:.3}
+
+/* HISTORY */
+.history-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem;width:100%;max-width:420px;margin-bottom:.75rem}
+.history-do{font-size:.85rem;font-weight:700;font-family:monospace;color:var(--muted)}
+.history-dest{font-size:.8rem;color:var(--text)}
+.history-time{font-size:.7rem;color:var(--muted);margin-top:.25rem}
+
+/* ── SCAN SCREEN ── */
+#scan-header{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;border-bottom:1px solid var(--border);width:100%;background:var(--card)}
+.back-btn{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:.2rem .5rem;line-height:1}
+#scan-title{font-weight:700;font-size:.9rem}
+#scan-do{font-size:.72rem;color:var(--muted);font-family:monospace}
+
+#camera-section{width:100%;background:#000;position:relative}
 #reader{width:100%;max-height:260px;overflow:hidden}
 #reader video{width:100%!important;max-height:260px;object-fit:cover}
+/* hide html5-qrcode default UI clutter */
 #reader__dashboard_section_swaplink{display:none!important}
 #reader__status_span{font-size:.7rem!important;color:var(--muted)!important}
 .scan-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:140px;border:2px solid var(--accent);border-radius:10px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
 .scan-line{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanline 1.8s ease-in-out infinite}
 @keyframes scanline{0%,100%{top:0}50%{top:calc(100% - 2px)}}
 
-.scan-status-bar{width:100%;padding:.65rem 1rem;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:.5rem}
-.scan-progress{font-size:.82rem;font-weight:700}
-.scan-progress span{color:var(--green)}
-.beep-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:background .15s}
-.beep-dot.success{background:var(--green)}
-.beep-dot.error{background:var(--red)}
-.beep-dot.dup{background:var(--yellow)}
+#manual-section{padding:.75rem 1rem;border-top:1px solid var(--border);background:var(--card);width:100%}
+.manual-label{font-size:.72rem;color:var(--muted);margin-bottom:.4rem}
+.scan-input-row{display:flex;gap:.5rem}
+#manual-input{flex:1;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none}
+#manual-input:focus{border-color:var(--accent)}
+#manual-btn{padding:.65rem 1rem;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap}
 
-.scan-feed{padding:.75rem 1rem 1rem;flex:1;overflow-y:auto;width:100%;-webkit-overflow-scrolling:touch}
-.scan-item{display:flex;align-items:center;gap:.65rem;padding:.6rem .75rem;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:.5rem;animation:slideIn .2s ease}
-@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-.scan-item.ok{border-color:var(--green)}
-.scan-item.err{border-color:var(--red)}
-.scan-icon{font-size:1.1rem;flex-shrink:0}
-.scan-info{flex:1;min-width:0}
-.scan-barcode{font-size:.75rem;font-family:monospace;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scan-note{font-size:.68rem;color:var(--muted);margin-top:.1rem}
-.scan-time{font-size:.65rem;color:var(--muted);flex-shrink:0}
+#scan-counter{padding:.65rem 1rem;background:var(--bg);display:flex;align-items:center;justify-content:space-between;width:100%;border-bottom:1px solid var(--border)}
+.counter-num{font-size:1.2rem;font-weight:800;color:var(--accent)}
+.counter-label{font-size:.72rem;color:var(--muted)}
+.beep-indicator{width:10px;height:10px;border-radius:50%;background:var(--border);transition:background .15s}
+.beep-indicator.active{background:var(--green)}
 
-.manual-bar{padding:.65rem 1rem;background:var(--card);border-top:1px solid var(--border);display:flex;gap:.5rem;width:100%;position:sticky;bottom:0}
-.manual-bar input{flex:1;padding:.6rem .75rem;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;outline:none}
-.manual-bar input:focus{border-color:var(--accent)}
-.manual-bar button{padding:.6rem 1rem;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:.8rem;font-weight:700;cursor:pointer}
+#scan-list{flex:1;overflow-y:auto;width:100%;padding:.5rem 1rem 5rem}
+.scan-item{display:flex;align-items:center;justify-content:space-between;padding:.6rem .75rem;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:.4rem}
+.scan-item.duplicate{border-color:var(--yellow);background:#f59e0b10}
+.scan-barcode{font-family:monospace;font-size:.85rem;font-weight:700}
+.scan-time{font-size:.68rem;color:var(--muted)}
+.scan-check{color:var(--green);font-size:1rem}
+.scan-dup{color:var(--yellow);font-size:.7rem;font-weight:700}
+.delete-scan{background:none;border:none;color:var(--red);cursor:pointer;font-size:.85rem;padding:.1rem .3rem}
 
-.scan-footer{position:relative;padding:.75rem 1rem;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.4rem;flex-shrink:0}
-.btn-confirm-receive{width:100%;padding:.85rem;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;opacity:.4;pointer-events:none;transition:opacity .2s}
-.btn-confirm-receive.ready{opacity:1;pointer-events:auto}
-.btn-skip-scan{width:100%;padding:.6rem;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:.82rem;font-weight:600;cursor:pointer}
-.scan-manual-row{display:flex;gap:.5rem}
-.scan-manual-row input{flex:1;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none}
-.scan-manual-row input:focus{border-color:var(--accent)}
-.scan-manual-row button{padding:.65rem 1rem;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:.82rem;font-weight:700;cursor:pointer}
+#scan-footer{position:fixed;bottom:0;left:0;right:0;padding:.75rem 1rem;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.4rem}
+.btn-depart{padding:.8rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;width:100%}
+.btn-depart:disabled{opacity:.4}
 
-/* TOAST */
-.toast{position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:.6rem 1.2rem;border-radius:20px;font-size:.8rem;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid var(--border)}
-.toast.show{opacity:1}
+/* DELIVERY LIST */
+.delivery-list{width:100%;max-width:420px}
+.delivery-item{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-bottom:.75rem;position:relative;transition:opacity .2s,transform .2s}
+.delivery-item.dragging{opacity:.4;transform:scale(.97)}
+.delivery-item.drag-over{border-color:var(--accent);background:#6366f115}
+.delivery-item-header{display:flex;align-items:center;gap:.65rem;margin-bottom:.5rem}
+.drag-handle{font-size:1.1rem;color:var(--muted);cursor:grab;padding:.1rem .2rem;touch-action:none;flex-shrink:0}
+.drag-handle:active{cursor:grabbing}
+.seq-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.delivery-do{font-size:.88rem;font-weight:800;font-family:monospace;color:var(--accent);flex:1}
+.delivery-eta{font-size:.7rem;color:var(--yellow);font-weight:700;white-space:nowrap}
+.delivery-dest{font-size:.85rem;font-weight:600;margin-bottom:.2rem}
+.delivery-status{font-size:.72rem;color:var(--muted);margin-bottom:.6rem}
+.delivery-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+.btn-arrived-sm{padding:.5rem .9rem;background:var(--green);border:none;border-radius:8px;color:#fff;font-size:.78rem;font-weight:700;cursor:pointer}
+.btn-waiting{padding:.5rem .9rem;background:#f59e0b20;border:1px solid var(--yellow);border-radius:8px;color:var(--yellow);font-size:.78rem;font-weight:700;cursor:default}
+.btn-pod{padding:.5rem .9rem;background:#10b98120;border:1px solid var(--green);border-radius:8px;color:var(--green);font-size:.78rem;font-weight:700;cursor:pointer}
 
-/* SIGNATURE MODAL */
-.sig-modal{position:fixed;inset:0;background:rgba(15,23,42,.92);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
-.sig-sheet{background:var(--card);border-radius:20px 20px 0 0;padding:1.25rem 1rem 2.5rem;width:100%;max-width:480px}
-.sig-title{font-size:1rem;font-weight:800;margin-bottom:.2rem}
-.sig-sub{font-size:.78rem;color:var(--muted);margin-bottom:1.1rem}
-.sig-canvas-wrap{position:relative;background:#fff;border-radius:10px;margin-bottom:.75rem;overflow:hidden}
-#sig-canvas{display:block;width:100%;cursor:crosshair;touch-action:none}
-.sig-clear{position:absolute;top:.4rem;right:.4rem;background:rgba(15,23,42,.7);border:none;color:#fff;border-radius:6px;font-size:.7rem;padding:.2rem .55rem;cursor:pointer}
-.sig-submit{width:100%;padding:.85rem;background:var(--green);color:#fff;border:none;border-radius:12px;font-size:.95rem;font-weight:700;cursor:pointer;margin-top:.4rem}
-.sig-cancel{width:100%;padding:.65rem;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:12px;font-size:.85rem;cursor:pointer;margin-top:.5rem}
+/* POD SCREEN */
+#screen-pod{background:var(--bg)}
+.pod-header{width:100%;max-width:420px;text-align:center;margin-bottom:1.5rem}
+.pod-icon{font-size:3.5rem;margin-bottom:.5rem}
+.pod-title{font-size:1.2rem;font-weight:800;color:var(--green);margin-bottom:.25rem}
+.pod-sub{font-size:.8rem;color:var(--muted)}
+.pod-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.25rem;width:100%;max-width:420px;margin-bottom:1rem}
+.pod-row{display:flex;justify-content:space-between;align-items:flex-start;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.82rem}
+.pod-row:last-child{border-bottom:none}
+.pod-label{color:var(--muted);font-size:.75rem}
+.pod-value{font-weight:700;text-align:right;font-family:monospace;font-size:.78rem;max-width:65%}
+.pod-carton-list{margin-top:.5rem}
+.pod-carton-item{font-size:.72rem;font-family:monospace;padding:.2rem 0;color:var(--muted);border-bottom:1px solid #334155}
+.pod-carton-item:last-child{border-bottom:none}
 
-/* LOADING */
-.loading-wrap{display:flex;align-items:center;justify-content:center;padding:2rem;width:100%;max-width:420px}
-.spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+/* SPINNER */
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* TABS */
-.tab-bar{display:flex;gap:.35rem;width:100%;max-width:420px;margin-bottom:1rem;background:var(--card);border-radius:12px;padding:.3rem;border:1px solid var(--border)}
-.tab-btn{flex:1;padding:.5rem;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);transition:background .15s,color .15s}
-.tab-btn.active{background:var(--accent);color:#fff}
-
-/* HISTORY CARDS */
-.hist-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;width:100%;max-width:420px;margin-bottom:.65rem}
-.hist-do{font-size:.82rem;font-weight:800;font-family:monospace;color:var(--accent);margin-bottom:.2rem}
-.hist-meta{font-size:.7rem;color:var(--muted);margin-bottom:.5rem}
-.hist-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.18rem .5rem;border-radius:20px;font-size:.68rem;font-weight:700;background:#10b98120;color:var(--green);border:1px solid #10b98140}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:.4rem}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.6)}50%{box-shadow:0 0 0 8px rgba(99,102,241,0)}}
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
-<div class="screen active" id="screen-login">
-  <div class="login-logo">📦</div>
-  <div class="login-title">Boutique Receiving</div>
-  <div class="login-sub">Log masuk untuk mula penerimaan</div>
-  <div class="login-card">
-    <div class="err-msg" id="login-err">Username atau password salah.</div>
-    <div class="field">
-      <label>Username</label>
-      <input type="text" id="login-user" placeholder="Masukkan username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"/>
-    </div>
-    <div class="field">
-      <label>Password</label>
-      <div style="position:relative">
-        <input type="password" id="login-pass" placeholder="Masukkan password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:2.5rem"/>
-        <button type="button" onclick="togglePw()" style="position:absolute;right:.65rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;color:var(--muted);padding:0;line-height:1" id="pw-eye">👁</button>
-      </div>
-    </div>
-    <button class="btn-full" id="login-btn" onclick="doLogin()">Log Masuk</button>
-  </div>
+<div id="lang-bar">
+  <button class="lang-btn active" onclick="setLang('ms')" id="btn-ms">BM</button>
+  <button class="lang-btn" onclick="setLang('en')" id="btn-en" style="margin-left:.4rem">EN</button>
 </div>
 
-<!-- BOUTIQUE PICKER (admin only) -->
-<div class="screen" id="screen-boutique-pick">
-  <div style="font-size:2rem;margin-bottom:.5rem;text-align:center">🏪</div>
-  <div class="picker-title">Pilih Butik</div>
-  <div class="picker-sub">Log masuk sebagai admin — pilih butik untuk terima penghantaran</div>
-  <div class="picker-card">
-    <div id="boutique-pick-list"><div class="loading-wrap"><div class="spinner"></div></div></div>
+<!-- SPLASH -->
+<div id="splash" style="position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999">
+  <div style="font-size:3rem;margin-bottom:.75rem">🚐</div>
+  <div style="font-size:.8rem;color:var(--muted)">Loading...</div>
+</div>
+
+<!-- LOGIN -->
+<div class="screen" id="screen-login">
+  <div class="login-logo">🚐</div>
+  <div class="login-title" data-t="loginTitle">Fleet Driver</div>
+  <div class="login-sub" data-t="loginSub">Log masuk untuk mula perjalanan</div>
+  <div class="login-card">
+    <div class="field">
+      <label data-t="username">Nama Pengguna</label>
+      <input type="text" id="inp-user" autocomplete="username" placeholder="Masukkan nama pengguna" data-placeholder-t="userPlaceholder"/>
+    </div>
+    <div class="field">
+      <label data-t="password">Kata Laluan</label>
+      <input type="password" id="inp-pass" autocomplete="current-password" placeholder="Masukkan kata laluan" data-placeholder-t="passPlaceholder"/>
+    </div>
+    <div class="err-msg" id="login-err"></div>
+    <button class="btn-full" id="login-btn" onclick="doLogin()" data-t="loginBtn">Log Masuk</button>
   </div>
-  <button class="logout-btn" style="margin-top:1.25rem" onclick="doLogout()">← Log Keluar</button>
 </div>
 
 <!-- HOME -->
 <div class="screen" id="screen-home">
-  <div class="home-header">
+  <div class="driver-header">
     <div>
-      <div class="greet-name" id="greet-name">—</div>
-      <div class="greet-boutique" id="greet-boutique">—</div>
+      <div class="driver-greet" id="greet-name">Driver</div>
+      <div class="driver-sub" id="greet-vehicle"></div>
     </div>
-    <div style="display:flex;gap:.4rem;align-items:center">
-      <button class="logout-btn" id="btn-change-boutique" onclick="changeBoutique()" style="display:none">🏪 Tukar</button>
-      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    <button class="logout-btn" onclick="doLogout()" data-t="logout">Log Keluar</button>
+  </div>
+  <!-- TABS -->
+  <div id="trip-tabs" style="display:flex;gap:.4rem;margin-bottom:1rem;width:100%;max-width:420px">
+    <button class="trip-tab active" id="tab-pickup" onclick="switchTripTab('pickup')">🚚 Pick Up</button>
+    <button class="trip-tab" id="tab-delivery" onclick="switchTripTab('delivery')">📦 Delivery</button>
+    <button class="trip-tab" id="tab-history" onclick="switchTripTab('history')">📋 History</button>
+  </div>
+  <div id="trip-map-wrap" style="display:none">
+    <div id="trip-map"></div>
+    <div class="map-label">
+      <span data-t="yourLocation">Lokasi semasa anda</span>
+      <span id="gps-status" class="gps-off" data-t="gpsOff">GPS Tidak Aktif</span>
     </div>
   </div>
-  <div class="tab-bar">
-    <button class="tab-btn active" id="rtab-pending" onclick="switchReceiveTab('pending')">📦 Pending</button>
-    <button class="tab-btn" id="rtab-history" onclick="switchReceiveTab('history')">📋 History</button>
-  </div>
-  <div id="receive-tab-content" style="width:100%;max-width:420px">
-    <div class="loading-wrap"><div class="spinner"></div></div>
-  </div>
+  <div id="trip-content" style="width:100%;max-width:420px"></div>
 </div>
 
-<!-- SCAN -->
-<div class="screen" id="screen-scan" style="padding:0">
-  <div class="scan-topbar">
-    <button class="scan-back" onclick="closeScan()">←</button>
+<!-- SCAN SCREEN -->
+<div class="screen" id="screen-scan">
+  <div id="scan-header">
+    <button class="back-btn" onclick="closeScan()">‹</button>
     <div>
-      <div class="scan-title">Imbas Karton</div>
-      <div class="scan-do" id="scan-do-label">—</div>
+      <div id="scan-title" data-t="scanTitle">Scan Carton Pick Up</div>
+      <div id="scan-do"></div>
     </div>
-    <div class="beep-dot" id="beep-dot"></div>
   </div>
 
-  <div class="camera-wrap">
+  <div id="camera-section">
     <div id="reader"></div>
     <div class="scan-overlay"><div class="scan-line"></div></div>
   </div>
 
-  <div class="scan-status-bar">
+  <div id="scan-counter">
     <div>
-      <div class="scan-progress">Diimbas: <span id="scan-count" style="color:var(--green);font-size:1.2rem;font-weight:800">0</span> / <span id="scan-total">?</span> karton</div>
-      <div style="font-size:.68rem;color:var(--muted)">Imbas QR kod karton</div>
+      <div class="counter-num" id="scan-count">0</div>
+      <div class="counter-label" data-t="cartonScanned">carton discanned</div>
     </div>
     <div style="display:flex;align-items:center;gap:.5rem">
-      <div id="scan-status-msg" style="font-size:.72rem;color:var(--muted);text-align:right"></div>
-      <div class="beep-dot" id="beep-dot"></div>
+      <span style="font-size:.72rem;color:var(--muted)" data-t="scanStatus">Scan atau taip barcode</span>
+      <div class="beep-indicator" id="beep-dot"></div>
     </div>
   </div>
 
-  <div class="scan-feed" id="scan-feed"></div>
-
-  <div class="scan-footer">
-    <button class="btn-confirm-receive" id="confirm-btn" onclick="openSignatureModal()">✅ Sahkan Penerimaan</button>
-    <div class="scan-manual-row">
-      <input type="text" id="manual-input" placeholder="Input manual / external scanner..." inputmode="none" autocomplete="off" autocorrect="off"/>
-      <button onclick="addManualScan()">OK</button>
+  <div id="manual-section">
+    <div class="manual-label" data-t="manualLabel">Scanner luaran / taip manual:</div>
+    <div class="scan-input-row">
+      <input type="text" id="manual-input" placeholder="Barcode..." autocomplete="off" autocorrect="off"/>
+      <button id="manual-btn" onclick="addManualScan()" data-t="add">Tambah</button>
     </div>
+    <div id="scan-status" style="min-height:1.2rem;font-size:.75rem;margin-top:.4rem;font-weight:700;transition:color .2s"></div>
+  </div>
+
+  <div id="scan-list"></div>
+
+  <div id="scan-footer">
+    <button class="btn-depart" id="depart-btn" onclick="doDepart()" disabled data-t="departBtn">🚀 Selesai &amp; Mula Perjalanan</button>
+    <button class="btn-secondary" onclick="closeScan()" data-t="backBtn">‹ Kembali</button>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
-
-<!-- SIGNATURE MODAL -->
-<div id="sig-modal" class="sig-modal" style="display:none">
-  <div class="sig-sheet">
-    <div class="sig-title">✍️ Pengesahan Penerimaan</div>
-    <div class="sig-sub">Sila isikan nama dan tandatangan penerima</div>
-    <div class="field" style="margin-bottom:.85rem">
-      <label>Nama Penerima</label>
-      <input type="text" id="sig-name" placeholder="Nama penuh penerima..." autocomplete="off"/>
-    </div>
-    <div style="font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:.35rem">Tandatangan</div>
-    <div class="sig-canvas-wrap">
-      <canvas id="sig-canvas" height="160"></canvas>
-      <button class="sig-clear" onclick="clearSig()">✕ Clear</button>
-    </div>
-    <button class="sig-submit" onclick="submitSignature()">✅ Sahkan &amp; Simpan</button>
-    <button class="sig-cancel" onclick="closeSignatureModal()">Batal</button>
+<!-- POD SCREEN -->
+<div class="screen" id="screen-pod">
+  <div class="pod-header">
+    <div class="pod-icon">✅</div>
+    <div class="pod-title">Delivery Confirmed</div>
+    <div class="pod-sub" id="pod-sub">Proof of delivery has been received.</div>
   </div>
+  <div class="pod-card" id="pod-details"></div>
+  <div class="pod-card" id="pod-signature-card" style="display:none">
+    <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.06em">Receiver Signature</div>
+    <div id="pod-receiver-name" style="font-size:.82rem;font-weight:600;margin-bottom:.5rem;color:var(--text)"></div>
+    <img id="pod-signature-img" src="" alt="Signature" style="width:100%;border-radius:8px;background:#fff;display:block"/>
+  </div>
+  <div class="pod-card" id="pod-cartons" style="display:none">
+    <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.06em">Cartons Received</div>
+    <div class="pod-carton-list" id="pod-carton-list"></div>
+  </div>
+  <div id="pod-capture-area" style="width:100%;max-width:420px"></div>
+
+  <!-- PHOTO CAPTURE -->
+  <input type="file" id="pod-photo-input" accept="image/*" capture="environment" style="display:none" onchange="onPodPhotoChosen(this)"/>
+  <div id="pod-photo-card" class="pod-card" style="width:100%;max-width:420px">
+    <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.06em">📷 Gambar Bukti</div>
+    <div id="pod-photo-preview" style="display:none;margin-bottom:.6rem">
+      <img id="pod-photo-img" src="" alt="Gambar bukti" style="width:100%;border-radius:8px;display:block;object-fit:cover;max-height:220px"/>
+      <button onclick="clearPodPhoto()" style="margin-top:.4rem;background:none;border:1px solid #ef444480;color:#ef4444;border-radius:6px;padding:.3rem .7rem;font-size:.72rem;cursor:pointer">✕ Buang gambar</button>
+    </div>
+    <button id="pod-photo-btn" class="action-btn btn-secondary" style="max-width:100%;margin-top:0" onclick="document.getElementById('pod-photo-input').click()">📷 Ambil Gambar</button>
+  </div>
+
+  <button id="btn-delivered" class="action-btn" style="max-width:420px;margin-top:.5rem;background:#10b981" onclick="confirmDelivered()">✅ Delivered</button>
+  <button class="action-btn btn-secondary" style="max-width:420px;margin-top:.5rem" onclick="closePOD()">← Back</button>
 </div>
 
 <script>
+// ── CONFIG ─────────────────────────────────────
 const SUPA_URL = 'https://lrathqgqspkiiwumsoar.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyYXRocWdxc3BraWl3dW1zb2FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTk4OTIsImV4cCI6MjA5NjQ5NTg5Mn0.UIu3uMD5SXZ4WyzCuKt27iJvEvL4FO2a-Tg9-cHbaNg';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+const WAREHOUSE = { lat: 3.0496093, lng: 101.541969, name: 'Hap Seng Business Park' };
 
-let _user = null;
+// ── TRANSLATIONS ────────────────────────────────
+const T = {
+  ms:{
+    loginTitle:'Fleet Driver',loginSub:'Log masuk untuk mula perjalanan',
+    username:'Nama Pengguna',password:'Kata Laluan',
+    userPlaceholder:'Masukkan nama pengguna',passPlaceholder:'Masukkan kata laluan',
+    loginBtn:'Log Masuk',loginErr:'Nama pengguna atau kata laluan salah.',loginLoading:'Sedang log masuk...',
+    logout:'Log Keluar',yourLocation:'Lokasi semasa anda',gpsOn:'GPS Aktif ✓',gpsOff:'GPS Tidak Aktif',
+    noTrip:'Tiada perjalanan aktif',noTripSub:'Tiada trip yang ditugaskan kepada anda buat masa ini.',
+    tripAssigned:'Trip Ditugaskan',tripInTransit:'Dalam Perjalanan',tripArrived:'Selesai',
+    startScan:'📦 Mula Scan Carton Pick Up',startTrip:'🚀 Mula Perjalanan (tanpa scan)',
+    arrived:'✅ Sudah Sampai',confirmArrive:'Confirm dah sampai destinasi?',arriving:'Merekod ketibaan...',
+    scanTitle:'Scan Carton Pick Up',cartonScanned:'carton discanned',
+    scanStatus:'Scan atau taip barcode',manualLabel:'Scanner luaran / taip manual:',
+    add:'Tambah',departBtn:'🚀 Selesai & Mula Perjalanan',backBtn:'‹ Kembali',
+    dupWarning:'Dah scan!',recentTrips:'Perjalanan Terkini',
+    confirmDepart:'Mula perjalanan dengan {n} carton yang discanned?',
+    confirmDepartZero:'Tiada carton discanned. Mahu teruskan juga?',
+  },
+  en:{
+    loginTitle:'Fleet Driver',loginSub:'Please sign in to begin your journey',
+    username:'Username',password:'Password',
+    userPlaceholder:'Enter username',passPlaceholder:'Enter password',
+    loginBtn:'Sign In',loginErr:'Incorrect username or password. Please try again.',loginLoading:'Signing in...',
+    logout:'Sign Out',yourLocation:'Current Location',gpsOn:'GPS Active ✓',gpsOff:'GPS Inactive',
+    noTrip:'No Active Trip',noTripSub:'You have no trips assigned at this time.',
+    tripAssigned:'Assigned',tripInTransit:'In Transit',tripArrived:'Completed',
+    startScan:'📦 Start Carton Scan (Pick Up)',startTrip:'🚀 Start Trip (Without Scan)',
+    arrived:'✅ Mark as Arrived',confirmArrive:'Please confirm arrival at this destination.',arriving:'Recording arrival...',
+    scanTitle:'Carton Pick-Up Scan',cartonScanned:'cartons scanned',
+    scanStatus:'Scan or enter barcode',manualLabel:'External scanner / manual entry:',
+    add:'Add',departBtn:'🚀 Complete & Start Trip',backBtn:'‹ Back',
+    dupWarning:'This carton has already been scanned.',recentTrips:'Recent Trips',
+    confirmDepart:'Start trip with {n} scanned carton(s)?',
+    confirmDepartZero:'No cartons have been scanned. Continue anyway?',
+  }
+};
+
+let _lang = localStorage.getItem('driver_lang') || 'en';
+let _driver = null;
+let _trip = null;
+let _gpsInterval = null;
+let _driverMap = null;
+let _driverMarker = null;
+let _destMarker = null;
+let _routeLine = null;
+let _destCoords = null;
+
+async function fetchOSRMRoute(fromLat, fromLng, toLat, toLng) {
+  try {
+    const url = 'https://router.project-osrm.org/route/v1/driving/' + fromLng + ',' + fromLat + ';' + toLng + ',' + toLat + '?geometries=geojson&overview=full';
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes[0]) {
+      return data.routes[0].geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+    }
+  } catch(e) {}
+  return null;
+}
 let _scanner = null;
-let _scans = [];          // received cartons this session
-let _currentDelivery = null;  // { doNo, batchNo, requestIds, expectedCartons, fromName }
-let _allCartons = [];     // registered cartons for current delivery
-var _cardPayloads = {};   // key → payload map for batch select (avoids JSON parse on mobile)
+let _scans = []; // { barcode, time, dbId }
+let _regCartons = []; // registered cartons for current trip: { id, barcode, carton_no, total_cartons }
+let _allTrips = []; // all active trips for this driver
+let _currentTab = 'pickup'; // 'pickup' | 'delivery'
 
-// ── UTILS ────────────────────────────────────────
+// ── LANG ────────────────────────────────────────
+function setLang(l) {
+  _lang = l;
+  localStorage.setItem('driver_lang', l);
+  document.getElementById('btn-ms').classList.toggle('active', l === 'ms');
+  document.getElementById('btn-en').classList.toggle('active', l === 'en');
+  applyT();
+}
+function t(k, vars) {
+  let s = (T[_lang] && T[_lang][k]) ? T[_lang][k] : (T.ms[k] || k);
+  if (vars) Object.keys(vars).forEach(function(v){ s = s.replace('{'+v+'}', vars[v]); });
+  return s;
+}
+function applyT() {
+  document.querySelectorAll('[data-t]').forEach(function(el){ el.textContent = t(el.getAttribute('data-t')); });
+  document.querySelectorAll('[data-placeholder-t]').forEach(function(el){ el.placeholder = t(el.getAttribute('data-placeholder-t')); });
+}
+
+// ── LOGIN ────────────────────────────────────────
+async function doLogin() {
+  const user = document.getElementById('inp-user').value.trim();
+  const pass = document.getElementById('inp-pass').value;
+  const errEl = document.getElementById('login-err');
+  const btn = document.getElementById('login-btn');
+  if (!user || !pass) return;
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>' + t('loginLoading');
+  const { data, error } = await sb.from('fleet_drivers').select('*').ilike('name', user).eq('password', pass).single();
+  if (error || !data) {
+    errEl.textContent = t('loginErr'); errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = t('loginBtn'); return;
+  }
+  _driver = data;
+  localStorage.setItem('driver_session', JSON.stringify({ id: data.id }));
+  showHome();
+}
+
+function doLogout() {
+  stopGPS(); stopScanner();
+  _driver = null; _trip = null; _scans = []; _allTrips = []; _regCartons = [];
+  localStorage.removeItem('driver_session');
+  showScreen('screen-login');
+  document.getElementById('inp-pass').value = '';
+}
+
+// ── SCREENS ─────────────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
 }
 
-function showToast(msg, dur) {
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(function(){ t.classList.remove('show'); }, dur || 2500);
-}
-
-function fmtTime(d) {
-  return d.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-}
-
-// ── TOGGLE PASSWORD ───────────────────────────────
-function togglePw() {
-  var inp = document.getElementById('login-pass');
-  var btn = document.getElementById('pw-eye');
-  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
-  else { inp.type = 'password'; btn.textContent = '👁'; }
-}
-
-// ── SHA256 ────────────────────────────────────────
-async function sha256hex(text) {
-  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
-}
-
-// ── AUTH ─────────────────────────────────────────
-async function doLogin() {
-  var user = document.getElementById('login-user').value.trim();
-  var pass = document.getElementById('login-pass').value;
-  var btn  = document.getElementById('login-btn');
-  var err  = document.getElementById('login-err');
-  if (!user || !pass) { err.style.display='block'; err.textContent='Sila isi semua maklumat.'; return; }
-  btn.disabled = true; btn.textContent = 'Loading...';
-  err.style.display = 'none';
-
-  var hash = await sha256hex(pass);
-  var { data: users } = await sb.from('app_users')
-    .select('id, username, full_name, role, boutique_id, boutique:boutique_id(name)')
-    .eq('username', user).eq('password_hash', hash).limit(1);
-
-  if (!users || !users.length) {
-    err.style.display = 'block'; err.textContent = 'Username atau password salah.';
-    btn.disabled = false; btn.textContent = 'Log Masuk'; return;
-  }
-
-  _user = users[0];
-  localStorage.setItem('receive_user', JSON.stringify(_user));
-  btn.disabled = false; btn.textContent = 'Log Masuk';
-
-  // Admin (no boutique_id) → show boutique picker
-  if (!_user.boutique_id) {
-    showScreen('screen-boutique-pick');
-    loadBoutiquePicker();
-  } else {
-    document.getElementById('greet-name').textContent = _user.full_name || _user.username;
-    document.getElementById('greet-boutique').textContent = _user.boutique ? _user.boutique.name : '—';
-    showScreen('screen-home');
-    loadDeliveries();
-  }
-}
-
-// ── BOUTIQUE PICKER ───────────────────────────────
-async function loadBoutiquePicker() {
-  var el = document.getElementById('boutique-pick-list');
-  var { data: boutiques } = await sb.from('boutiques').select('id, name').order('name');
-  if (!boutiques || !boutiques.length) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:.8rem;text-align:center">Tiada butik dijumpai.</p>';
-    return;
-  }
-  el.innerHTML = boutiques.map(function(b){
-    return '<div class="boutique-item" onclick=\'selectBoutique(' + JSON.stringify(b) + ')\'>'
-      + '<span style="font-size:1.1rem">🏪</span>'
-      + '<span class="b-name">' + b.name + '</span>'
-      + '<span class="b-arrow">›</span>'
-      + '</div>';
-  }).join('');
-}
-
-function selectBoutique(boutique) {
-  _user.boutique_id = boutique.id;
-  _user.boutique = { name: boutique.name };
-  localStorage.setItem('receive_user', JSON.stringify(_user));
-  document.getElementById('greet-name').textContent = _user.full_name || _user.username;
-  document.getElementById('greet-boutique').textContent = boutique.name;
-  // Show "Tukar" button for admin
-  if (_user.role === 'admin') document.getElementById('btn-change-boutique').style.display = 'inline-flex';
+async function showHome() {
   showScreen('screen-home');
-  loadDeliveries();
+  document.getElementById('greet-name').textContent = _driver.name;
+  document.getElementById('greet-vehicle').textContent = _driver.phone || '';
+  await loadTrip();
 }
 
-function changeBoutique() {
-  showScreen('screen-boutique-pick');
-  loadBoutiquePicker();
-}
-
-function doLogout() {
-  _user = null;
-  localStorage.removeItem('receive_user');
-  showScreen('screen-login');
-  document.getElementById('login-user').value = '';
-  document.getElementById('login-pass').value = '';
-}
-
-// ── DELIVERIES ────────────────────────────────────
-var _receiveTab = 'pending';
-var _historyReqs = [];
-
-function switchReceiveTab(tab) {
-  _receiveTab = tab;
-  document.getElementById('rtab-pending').classList.toggle('active', tab === 'pending');
-  document.getElementById('rtab-history').classList.toggle('active', tab === 'history');
-  if (tab === 'pending') {
-    loadDeliveries();
+// ── TABS ─────────────────────────────────────────
+function switchTripTab(tab) {
+  _currentTab = tab;
+  document.getElementById('tab-pickup').classList.toggle('active', tab === 'pickup');
+  document.getElementById('tab-delivery').classList.toggle('active', tab === 'delivery');
+  document.getElementById('tab-history').classList.toggle('active', tab === 'history');
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  if (tab === 'pickup') {
+    stopGPS();
+    renderPickupList();
+  } else if (tab === 'delivery') {
+    _trip = null;
+    renderDeliveryList();
   } else {
-    renderReceiveHistory();
+    _trip = null;
+    stopGPS();
+    renderTripHistory();
   }
 }
 
-async function renderReceiveHistory() {
-  var content = document.getElementById('receive-tab-content');
-  // Build static shell once (so filters don't get wiped on re-render)
-  content.innerHTML =
-    '<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem">'
-    + '<input type="date" id="rhf-date" style="flex:1;min-width:110px;padding:.5rem .65rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyReceiveHistoryFilter()">'
-    + '<input type="text" id="rhf-do" placeholder="🔍 DO No..." style="flex:1;min-width:120px;padding:.5rem .65rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyReceiveHistoryFilter()">'
-    + '<button onclick="document.getElementById(\'rhf-date\').value=\'\';document.getElementById(\'rhf-do\').value=\'\';applyReceiveHistoryFilter()" style="padding:.5rem .75rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.78rem;cursor:pointer">✕</button>'
-    + '</div>'
-    + '<div id="rhist-list"><div class="loading-wrap"><div class="spinner"></div></div></div>';
-
-  var boutiqueId = _user && _user.boutique_id;
-  var isAdmin = _user && _user.role === 'admin';
-
-  var q = sb.from('stock_requests')
-    .select('id, do_no, batch_no, request_no, status, updated_at, from_b:from_boutique_id(name), to_b:to_boutique_id(name)')
-    .eq('status', 'Received')
-    .order('updated_at', { ascending: false })
-    .limit(100);
-
-  // Filter by boutique if user has one (regardless of role)
-  if (boutiqueId) {
-    q = q.eq('to_boutique_id', boutiqueId);
-  } else if (!isAdmin) {
-    document.getElementById('rhist-list').innerHTML = '<div class="no-delivery"><div class="icon">⚠️</div><p>Tiada boutique dikaitkan.</p></div>';
-    return;
+// ── TRIP ─────────────────────────────────────────
+async function loadTrip() {
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">⏳ Loading...</div>';
+  const { data: trips } = await sb.from('fleet_trips')
+    .select('*, vehicle:vehicle_id(plate_no,vehicle_type), leg')
+    .eq('driver_id', _driver.id)
+    .in('status', ['Assigned','Departed','Arrived'])
+    .order('created_at', { ascending: false });
+  // Auto-promote Arrived+pod_confirmed_at trips → Delivered in background
+  const toPromote = (trips || []).filter(function(t){ return t.status === 'Arrived' && t.pod_confirmed_at; });
+  if (toPromote.length) {
+    Promise.all(toPromote.map(function(t){ return sb.from('fleet_trips').update({ status: 'Delivered' }).eq('id', t.id); }));
+    toPromote.forEach(function(t){ t.status = 'Delivered'; });
   }
-
-  var { data: reqs } = await q;
-
-  // Deduplicate by do_no — keep latest updated_at
-  var doMap = {};
-  (reqs || []).forEach(function(r) {
-    var key = r.do_no || r.id;
-    if (!doMap[key] || r.updated_at > doMap[key].updated_at) doMap[key] = r;
+  // Check for recently POD-confirmed trips the driver hasn't viewed yet
+  const recentPod = toPromote.find(function(t){
+    return (Date.now() - new Date(t.pod_confirmed_at).getTime()) < 2 * 60 * 60 * 1000;
   });
-  _historyReqs = Object.values(doMap);
-  applyReceiveHistoryFilter();
-}
-
-function applyReceiveHistoryFilter() {
-  var listEl = document.getElementById('rhist-list');
-  if (!listEl) return;
-  var dateVal = (document.getElementById('rhf-date') || {}).value || '';
-  var doVal   = ((document.getElementById('rhf-do') || {}).value || '').trim().toLowerCase();
-
-  var filtered = _historyReqs.filter(function(r) {
-    if (dateVal && !(r.updated_at || '').startsWith(dateVal)) return false;
-    if (doVal && !(r.do_no || '').toLowerCase().includes(doVal)) return false;
-    return true;
-  });
-
-  if (!filtered.length) {
-    listEl.innerHTML = '<div class="no-delivery"><div class="icon">📋</div><p>Tiada rekod dijumpai.</p></div>';
-    return;
+  if (recentPod) {
+    setTimeout(function(){ viewPOD(recentPod.id, true); }, 300);
   }
+  // Exclude Arrived trips that already have POD confirmed (fully done)
+  _allTrips = (trips || []).filter(function(t){ return !(t.status === 'Arrived' && t.pod_confirmed_at); });
 
-  listEl.innerHTML = filtered.map(function(r) {
-    var dt = r.updated_at ? new Date(r.updated_at).toLocaleString('ms-MY', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
-    var from = r.to_b   ? r.to_b.name   : '—';
-    var to   = r.from_b ? r.from_b.name : '—';
-    return '<div class="hist-card">'
-      + '<div class="hist-do">' + (r.do_no || r.request_no || '—') + '</div>'
-      + '<div class="hist-meta">Dari: ' + from + ' → ' + to + '</div>'
-      + '<div class="hist-meta" style="margin-top:.15rem">' + dt + '</div>'
-      + '<span class="hist-badge">✅ Diterima</span>'
-      + '</div>';
-  }).join('');
-}
-
-// ── DELIVERIES ────────────────────────────────────
-async function loadDeliveries() {
-  var el = document.getElementById('receive-tab-content');
-  el.innerHTML = '<div class="loading-wrap"><div class="spinner"></div></div>';
-  if (!_user || !_user.boutique_id) {
-    el.innerHTML = '<div class="no-delivery"><div class="icon">⚠️</div><p>Tiada boutique dikaitkan dengan akaun ini.</p></div>';
-    return;
-  }
-
-  var boutiqueId   = _user.boutique_id;
-  var boutiqueName = _user.boutique ? _user.boutique.name : null;
-  console.log('[receive] boutiqueId:', boutiqueId, '| boutiqueName:', boutiqueName);
-
-  // ── 1a. stock_requests by from_boutique_id (In Transit / Arrived)
-  var { data: reqsFrom, error: errFrom } = await sb.from('stock_requests')
-    .select('id, do_no, batch_no, request_no, status, src:to_boutique_id(name)')
-    .eq('from_boutique_id', boutiqueId)
-    .in('status', ['In Transit', 'Arrived']);
-  console.log('[receive] stock_requests(from_boutique_id):', reqsFrom, errFrom);
-
-  // ── 1b. Also try to_boutique_id in case column roles are reversed
-  var { data: reqsTo, error: errTo } = await sb.from('stock_requests')
-    .select('id, do_no, batch_no, request_no, status, src:from_boutique_id(name)')
-    .eq('to_boutique_id', boutiqueId)
-    .in('status', ['In Transit', 'Arrived']);
-  console.log('[receive] stock_requests(to_boutique_id):', reqsTo, errTo);
-
-  // Merge both result sets (deduplicate by id)
-  var seenIds = new Set();
-  var allReqs = [];
-  [(reqsFrom || []), (reqsTo || [])].forEach(function(arr) {
-    arr.forEach(function(r) { if (!seenIds.has(r.id)) { seenIds.add(r.id); allReqs.push(r); } });
-  });
-
-  // Group stock_request results by DO / batch
-  var groups = {};
-  allReqs.forEach(function(r) {
-    var key = r.do_no || r.batch_no || r.request_no;
-    if (!key) return;
-    if (!groups[key]) groups[key] = { doNo: r.do_no, batchNo: r.batch_no || r.request_no, fromName: r.src ? r.src.name : '—', ids: [], tripId: null };
-    groups[key].ids.push(r.id);
-  });
-
-  // ── 2. Fallback: fleet_trips with status 'Arrived' destined here, no POD yet
-  //    Query all Arrived trips then filter by destination name (case-insensitive) in JS
-  var { data: trips, error: errTrips } = await sb.from('fleet_trips')
-    .select('id, do_no, destination, status, pod_confirmed_at, driver:fleet_drivers(name), vehicle:fleet_vehicles(plate_no)')
-    .eq('status', 'Arrived')
-    .is('pod_confirmed_at', null);
-  console.log('[receive] fleet_trips(Arrived):', trips, errTrips);
-
-  var nameLower = boutiqueName ? boutiqueName.trim().toLowerCase() : null;
-  (trips || []).forEach(function(trip) {
-    var destLower = trip.destination ? trip.destination.trim().toLowerCase() : '';
-    if (!nameLower || destLower !== nameLower) return;  // not for this boutique
-    var driverName = trip.driver ? trip.driver.name : null;
-    var platNo = trip.vehicle ? trip.vehicle.plate_no : null;
-    var key = trip.do_no || ('trip-' + trip.id);
-    if (groups[key]) {
-      groups[key].tripId = trip.id;
-      groups[key].driverName = driverName;
-      groups[key].platNo = platNo;
-      groups[key].isArrived = true;
-    } else {
-      groups[key] = {
-        doNo: trip.do_no || null,
-        batchNo: null,
-        fromName: '—',               // don't use driver name as source label
-        ids: [],
-        tripId: trip.id,
-        driverName: driverName,
-        platNo: platNo,
-        isArrived: true
-      };
-    }
-  });
-
-  if (!Object.keys(groups).length) {
-    el.innerHTML = '<div class="no-delivery"><div class="icon">🎉</div><p>Tiada penghantaran menunggu penerimaan.</p><button class="refresh-btn" onclick="loadDeliveries()">🔄 Muat Semula</button></div>';
-    return;
-  }
-
-  // ── 2b. Fill in missing fromName for fleet_trips fallback groups
-  var missingFromDOs = Object.values(groups).filter(function(g){ return g.fromName === '—' && g.doNo; }).map(function(g){ return g.doNo; });
-  if (missingFromDOs.length) {
-    var { data: srcReqs } = await sb.from('stock_requests')
-      .select('do_no, fulfiller:to_boutique_id(name)')
-      .in('do_no', missingFromDOs);
-    var doSrcMap = {};
-    (srcReqs || []).forEach(function(r){ if (r.do_no && r.fulfiller) doSrcMap[r.do_no] = r.fulfiller.name; });
-    Object.values(groups).forEach(function(g){
-      if (g.fromName === '—' && g.doNo && doSrcMap[g.doNo]) g.fromName = doSrcMap[g.doNo];
+  // For Leg 1 trips, fetch pickup boutique name via stock_requests (to_boutique = fulfiller due to DB swap)
+  var leg1Trips = _allTrips.filter(function(t){ return t.leg === 1 && t.do_no; });
+  if (leg1Trips.length) {
+    var leg1DoNos = leg1Trips.map(function(t){ return t.do_no; });
+    var { data: sreqs } = await sb.from('stock_requests')
+      .select('do_no, fulfiller:to_boutique_id(name), dest:from_boutique_id(name)')
+      .in('do_no', leg1DoNos)
+      .limit(leg1DoNos.length * 5);
+    var doFulfillerMap = {};
+    var doDestMap = {};
+    (sreqs || []).forEach(function(r){
+      if (r.do_no && r.fulfiller && r.fulfiller.name) doFulfillerMap[r.do_no] = r.fulfiller.name;
+      if (r.do_no && r.dest && r.dest.name) doDestMap[r.do_no] = r.dest.name;
+    });
+    _allTrips.forEach(function(t){
+      if (t.leg === 1 && t.do_no && doFulfillerMap[t.do_no]) t._pickupName = doFulfillerMap[t.do_no];
+      if (t.leg === 1 && t.do_no && doDestMap[t.do_no]) t._destBoutique = doDestMap[t.do_no];
     });
   }
 
-  // ── 3. Get carton counts — count rows (1 row = 1 carton), no status filter
-  var allDOs     = Object.values(groups).map(function(g){ return g.doNo; }).filter(Boolean);
-  var allBatches = Object.values(groups).map(function(g){ return !g.doNo && g.batchNo ? g.batchNo : null; }).filter(Boolean);
-  var cartonMap  = {};   // do_no / batch_no → count
+  // Auto-select tab: if has Departed/Arrived or leg2 Assigned trip, go to Delivery; else Pick Up
+  const hasDelivery = _allTrips.some(function(t){ return t.status === 'Departed' || t.status === 'Arrived' || (t.status === 'Assigned' && t.leg !== 1); });
+  const hasPickup   = _allTrips.some(function(t){ return t.status === 'Assigned' && t.leg === 1; });
 
-  if (allDOs.length || allBatches.length) {
-    // Count cartons by do_no
-    if (allDOs.length) {
-      var { data: cartons } = await sb.from('cartons').select('do_no, batch_no, sto_no').in('do_no', allDOs);
-      console.log('[receive] cartons by do_no:', cartons);
-      (cartons || []).forEach(function(c){
-        if (c.do_no) cartonMap[c.do_no] = (cartonMap[c.do_no] || 0) + 1;
-      });
+  // Update tab badges
+  const pickupCount   = _allTrips.filter(function(t){ return t.status === 'Assigned' && t.leg === 1; }).length;
+  const deliveryCount = _allTrips.filter(function(t){ return t.status === 'Departed' || t.status === 'Arrived' || (t.status === 'Assigned' && t.leg !== 1); }).length;
+  document.getElementById('tab-pickup').textContent   = '🚚 Pick Up'   + (pickupCount   > 0 ? ' (' + pickupCount   + ')' : '');
+  document.getElementById('tab-delivery').textContent = '📦 Delivery'  + (deliveryCount > 0 ? ' (' + deliveryCount + ')' : '');
+
+  // Auto-select tab with active trips
+  if (hasDelivery && !hasPickup) _currentTab = 'delivery';
+  else _currentTab = 'pickup';
+
+  document.getElementById('tab-pickup').classList.toggle('active', _currentTab === 'pickup');
+  document.getElementById('tab-delivery').classList.toggle('active', _currentTab === 'delivery');
+  document.getElementById('tab-history').classList.toggle('active', _currentTab === 'history');
+
+  _trip = null;
+  _destCoords = null;
+
+  if (_currentTab === 'pickup') {
+    renderPickupList();
+  } else {
+    renderDeliveryList();
+    const departedTrip = _allTrips.find(function(t){ return t.status === 'Departed'; });
+    if (departedTrip) { _trip = departedTrip; startGPS(); }
+  }
+}
+
+function renderTrip(showBack) {
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  // Back button (when opened from delivery list)
+  if (showBack) {
+    const backBtn = document.createElement('button');
+    backBtn.style.cssText = 'display:flex;align-items:center;gap:.4rem;background:transparent;border:none;color:var(--muted);font-size:.85rem;cursor:pointer;padding:.25rem 0;margin-bottom:.5rem;width:100%;max-width:420px';
+    backBtn.innerHTML = '‹ Back to List';
+    backBtn.addEventListener('click', function() {
+      document.getElementById('trip-map-wrap').style.display = 'none';
+      stopGPS();
+      if (_currentTab === 'pickup') renderPickupList();
+      else renderDeliveryList();
+    });
+    content.appendChild(backBtn);
+  }
+  if (!_trip) {
+    document.getElementById('trip-map-wrap').style.display = 'none';
+    const d = document.createElement('div');
+    d.className = 'no-trip';
+    d.innerHTML = '<div class="icon">📦</div><div style="font-weight:700;margin-bottom:.4rem">' + t('noTrip') + '</div><div style="font-size:.8rem">' + t('noTripSub') + '</div>';
+    content.appendChild(d);
+    loadRecentTrips();
+    return;
+  }
+
+  const statusLabel = { Assigned: t('tripAssigned'), Departed: t('tripInTransit'), Arrived: t('tripArrived') };
+  const statusClass = { Assigned: 'badge-assigned', Departed: 'badge-departed' };
+
+  const card = document.createElement('div');
+  card.className = 'trip-card';
+  const badge = document.createElement('div');
+  badge.className = 'trip-badge ' + (statusClass[_trip.status] || 'badge-assigned');
+  badge.textContent = statusLabel[_trip.status] || _trip.status;
+  card.appendChild(badge);
+  const doEl = document.createElement('div'); doEl.className = 'trip-do'; doEl.textContent = _trip.do_no || '—';
+  const destEl = document.createElement('div'); destEl.className = 'trip-dest';
+  const vehEl = document.createElement('div'); vehEl.className = 'trip-vehicle';
+  vehEl.textContent = _trip.vehicle ? (_trip.vehicle.plate_no + ' · ' + _trip.vehicle.vehicle_type) : '—';
+  card.appendChild(doEl); card.appendChild(destEl); card.appendChild(vehEl);
+
+  // Assigned = show PICKUP location (to_b = fulfiller), Departed = show DELIVERY destination
+  if (_trip.status === 'Assigned' && _trip.do_no) {
+    sb.from('stock_requests').select('to_b:to_boutique_id(name)').eq('do_no', _trip.do_no).limit(1).then(function(res){
+      const pickup = res.data && res.data[0] && res.data[0].to_b ? res.data[0].to_b.name : (_trip.destination || '—');
+      destEl.innerHTML = '<span style="font-size:.75rem;color:var(--muted)">📍 Pick Up From:</span><br>' + pickup
+        + '<div style="font-size:.72rem;color:var(--muted);margin-top:.15rem">→ ' + (_trip.destination || '—') + '</div>';
+    });
+  } else {
+    destEl.innerHTML = '<span style="font-size:.75rem;color:var(--muted)">📦 Deliver To:</span><br>' + (_trip.destination || '—');
+  }
+
+  // Scan count badge if assigned
+  if (_trip.status === 'Assigned') {
+    loadScanCount(card);
+  }
+  content.appendChild(card);
+
+  if (_trip.status === 'Assigned') {
+    const scanBtn = document.createElement('button');
+    scanBtn.className = 'action-btn btn-scan';
+    scanBtn.textContent = t('startScan');
+    scanBtn.addEventListener('click', openScan);
+    content.appendChild(scanBtn);
+  } else if (_trip.status === 'Departed') {
+    // Show carton scan summary
+    loadDeliveryCartonBadge(card);
+    document.getElementById('trip-map-wrap').style.display = 'block';
+    initDriverMap();
+    // Show destination pin immediately (before GPS fires)
+    if (_destCoords) {
+      const destIcon = L.divIcon({ className:'', html:'<div style="width:14px;height:14px;background:#10b981;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.4)"></div>', iconSize:[14,14], iconAnchor:[7,7] });
+      if (_destMarker) _driverMap.removeLayer(_destMarker);
+      _destMarker = L.marker([_destCoords.lat, _destCoords.lng], {icon:destIcon}).addTo(_driverMap).bindPopup('<b>🏁 ' + (_trip.destination || 'Destination') + '</b>');
+      _driverMap.setView([_destCoords.lat, _destCoords.lng], 14);
     }
-    // Count cartons by batch_no
-    if (allBatches.length) {
-      var { data: cartonsB } = await sb.from('cartons').select('batch_no').in('batch_no', allBatches);
-      (cartonsB || []).forEach(function(c){
-        if (c.batch_no) cartonMap[c.batch_no] = (cartonMap[c.batch_no] || 0) + 1;
-      });
+    // Leg 1 → Drop at Warehouse + option to deliver direct; Leg 2 → Arrived
+    if (_trip.leg === 1) {
+      const whBtn = document.createElement('button');
+      whBtn.className = 'action-btn';
+      whBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+      whBtn.textContent = '🏭 Drop at Warehouse';
+      whBtn.addEventListener('click', doDropWarehouse);
+      content.appendChild(whBtn);
+      const directBtn = document.createElement('button');
+      directBtn.className = 'action-btn';
+      directBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+      directBtn.textContent = '🏪 Direct Delivery';
+      directBtn.addEventListener('click', doDirectDelivery);
+      content.appendChild(directBtn);
+    } else {
+      const arrBtn = document.createElement('button');
+      arrBtn.className = 'action-btn btn-arrived';
+      arrBtn.textContent = t('arrived');
+      arrBtn.addEventListener('click', doArrived);
+      content.appendChild(arrBtn);
     }
-    // Fallback: carton_scans if nothing found in cartons table
-    var missingDOs = allDOs.filter(function(dn){ return !cartonMap[dn]; });
-    if (missingDOs.length) {
-      var tripIds = Object.values(groups)
-        .filter(function(g){ return missingDOs.indexOf(g.doNo) !== -1 && g.tripId; })
-        .map(function(g){ return g.tripId; });
-      if (tripIds.length) {
-        var { data: scans } = await sb.from('carton_scans').select('trip_id').in('trip_id', tripIds);
-        console.log('[receive] carton_scans fallback:', scans);
-        var tripToDoMap = {};
-        Object.values(groups).forEach(function(g){ if (g.tripId && g.doNo) tripToDoMap[g.tripId] = g.doNo; });
-        (scans || []).forEach(function(s){
-          var dn = tripToDoMap[s.trip_id];
-          if (dn) cartonMap[dn] = (cartonMap[dn] || 0) + 1;
-        });
+  } else if (_trip.status === 'Arrived') {
+    // Already arrived — show waiting for POD or open POD if confirmed
+    if (_trip.pod_confirmed_at) {
+      viewPOD(_trip.id);
+      return;
+    }
+    loadDeliveryCartonBadge(card);
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = 'text-align:center;padding:1.25rem 0 .5rem;width:100%;max-width:420px';
+    infoDiv.innerHTML = '<div style="font-size:2rem;margin-bottom:.35rem">📍</div>'
+      + '<div style="font-weight:700;margin-bottom:.25rem">Delivery Submitted</div>'
+      + '<div style="font-size:.8rem;color:var(--muted);margin-bottom:1rem">Awaiting boutique staff to confirm receipt of cartons.</div>';
+    content.appendChild(infoDiv);
+    const podBtn = document.createElement('button');
+    podBtn.id = 'pod-wait-btn';
+    podBtn.disabled = true;
+    podBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:var(--border);color:var(--muted);border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:not-allowed;opacity:.5';
+    podBtn.textContent = '📄 View POD';
+    content.appendChild(podBtn);
+    const hintDiv = document.createElement('div');
+    hintDiv.style.cssText = 'font-size:.72rem;color:var(--muted);margin-top:.6rem;text-align:center;width:100%;max-width:420px';
+    hintDiv.textContent = 'Button will unlock once boutique staff confirms receipt.';
+    content.appendChild(hintDiv);
+    // Poll for POD
+    const tripId = _trip.id;
+    const tripRef = _trip;
+    const poll = setInterval(async function() {
+      const { data } = await sb.from('fleet_trips').select('pod_confirmed_at, pod_confirmed_by, receiver_name, signature_image').eq('id', tripId).single();
+      if (data && data.pod_confirmed_at) {
+        clearInterval(poll);
+        if (tripRef.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', tripRef.vehicle_id);
+        await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+        Object.assign(tripRef, data);
+        _allTrips = _allTrips.filter(function(x){ return x.id !== tripId; });
+        viewPOD(tripId);
+      }
+    }, 5000);
+  }
+}
+
+async function loadScanCount(card) {
+  const scanRes = await sb.from('carton_scans').select('id', { count: 'exact', head: true }).eq('trip_id', _trip.id);
+  const scanned = scanRes.count || 0;
+
+  let expected = 0;
+  if (_trip.do_no) {
+    // Count all cartons for this DO
+    const { count: cntByDo } = await sb.from('cartons').select('id', { count: 'exact', head: true }).eq('do_no', _trip.do_no);
+    if (cntByDo > 0) {
+      expected = cntByDo;
+    } else {
+      // Fallback: get all batch_nos from stock_requests, count cartons by batch
+      const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', _trip.do_no);
+      const bkeys = (sr || []).map(r => r.batch_no || r.request_no).filter(Boolean);
+      if (bkeys.length) {
+        const { count: cntByBatch } = await sb.from('cartons').select('id', { count: 'exact', head: true }).in('batch_no', bkeys);
+        if (cntByBatch > 0) expected = cntByBatch;
       }
     }
   }
 
-  // ── 4. Render
-  var html = '';
-  var destName = boutiqueName || '—';
-  var hasArrived = Object.values(groups).some(function(g){ return !!g.isArrived; });
+  const el = document.createElement('div');
+  el.style.cssText = 'margin-top:.4rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap';
 
-  // "Pilih Semua" header if there are arrived orders
-  if (hasArrived) {
-    html += '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;max-width:420px;width:100%">'
-      + '<label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--muted);cursor:pointer">'
-      + '<input type="checkbox" id="chk-all" onchange="toggleSelectAll(this.checked)" style="width:16px;height:16px;cursor:pointer"> Pilih Semua'
-      + '</label></div>';
-  }
-
-  _cardPayloads = {}; // reset map each render
-  Object.keys(groups).forEach(function(key) {
-    var g = groups[key];
-    var count = cartonMap[g.doNo] || cartonMap[g.batchNo] || 0;
-    var payload = { doNo: g.doNo, batchNo: g.batchNo, fromName: g.fromName, ids: g.ids, expectedCartons: count, tripId: g.tripId || null };
-    var cardKey = g.doNo || g.batchNo || key;
-    _cardPayloads[cardKey] = payload; // store in global map
-    var isArrived = !!g.isArrived;
-    var sourceLabel = g.fromName && g.fromName !== '—' ? g.fromName : null;
-    var metaParts = [];
-    if (g.driverName) metaParts.push('Pemandu: ' + g.driverName);
-    if (g.platNo)     metaParts.push('🚗 ' + g.platNo);
-    if (g.ids.length) metaParts.push(g.ids.length + ' item');
-    html += '<div class="delivery-card" data-key="' + cardKey + '" data-arrived="' + (isArrived ? '1' : '0') + '">'
-      + '<div style="display:flex;align-items:flex-start;gap:.6rem">'
-      + (isArrived ? '<input type="checkbox" class="order-chk" onchange="updateBatchBtn()" style="width:18px;height:18px;margin-top:.2rem;cursor:pointer;flex-shrink:0">' : '<div style="width:18px;flex-shrink:0"></div>')
-      + '<div style="flex:1">'
-      // Status badge
-      + '<div class="dc-status ' + (isArrived ? 'arrived' : 'transit') + '">'
-        + (isArrived ? '📍 Driver Tiba' : '🚚 Dalam Perjalanan')
-      + '</div>'
-      + '<div class="dc-do">' + (g.doNo || g.batchNo || 'Trip #' + (g.tripId || '—')) + '</div>'
-      + '<div class="dc-route"><div class="dc-route-from">' + (sourceLabel || '—') + '</div><div class="dc-route-arrow">→</div><div class="dc-route-to">' + destName + '</div></div>'
-      + (metaParts.length ? '<div class="dc-meta">' + metaParts.join(' · ') + '</div>' : '')
-      + (count > 0
-          ? '<div class="dc-carton has">📦 ' + count + ' karton dijangka</div>'
-          : '<div class="dc-carton none">📦 Tiada karton didaftarkan</div>')
-      + '<button class="btn-receive" onclick=\'startReceive(' + JSON.stringify(payload) + ')\'>📥 Mula Terima</button>'
-      + '</div></div></div>';
-  });
-  html += '<button class="refresh-btn" style="width:100%;max-width:420px;margin-top:.25rem" onclick="loadDeliveries()">🔄 Muat Semula</button>';
-  el.innerHTML = html;
-
-  // Floating batch receive button
-  var existing = document.getElementById('batch-receive-bar');
-  if (existing) existing.remove();
-  if (hasArrived) {
-    var bar = document.createElement('div');
-    bar.id = 'batch-receive-bar';
-    bar.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:999;display:none;animation:fadeIn .2s';
-    bar.innerHTML = '<button id="batch-receive-btn" onclick="startBatchReceive()" style="padding:.75rem 2rem;background:#10b981;color:#fff;border:none;border-radius:14px;font-size:.95rem;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(16,185,129,.4)">📥 Terima Dipilih (<span id="batch-count">0</span>)</button>';
-    document.body.appendChild(bar);
-  }
-}
-
-// ── START RECEIVING ───────────────────────────────
-async function startReceive(delivery) {
-  _currentDelivery = delivery;
-  _scans = [];
-
-  // Fetch cartons for this delivery — no status filter (may have been scanned already by driver)
-  console.log('[startReceive] delivery:', delivery);
-  var cartonData = null, cartonErr = null;
-  if (delivery.doNo) {
-    var res = await sb.from('cartons').select('id, barcode, carton_no, total_cartons, do_no, batch_no').eq('do_no', delivery.doNo);
-    cartonData = res.data; cartonErr = res.error;
-  } else if (delivery.batchNo) {
-    var res = await sb.from('cartons').select('id, barcode, carton_no, total_cartons, do_no, batch_no').eq('batch_no', delivery.batchNo);
-    cartonData = res.data; cartonErr = res.error;
-  }
-  console.log('[startReceive] carton query result:', cartonData, cartonErr);
-  _allCartons = cartonData || [];
-
-  // Fallback: load from carton_scans if cartons table has no rows for this DO
-  if (!_allCartons.length && delivery.tripId) {
-    var { data: scans } = await sb.from('carton_scans')
-      .select('barcode, trip_id').eq('trip_id', delivery.tripId);
-    console.log('[startReceive] carton_scans fallback:', scans);
-    _allCartons = (scans || []).map(function(s, i) {
-      return { id: null, barcode: s.barcode, carton_no: i + 1, total_cartons: (scans || []).length, do_no: delivery.doNo, batch_no: delivery.batchNo };
-    });
-  }
-
-  var label = delivery.doNo || delivery.batchNo || '—';
-  document.getElementById('scan-do-label').textContent = label;
-  document.getElementById('scan-count').textContent = '0';
-  document.getElementById('scan-total').textContent = _allCartons.length || delivery.expectedCartons || '?';
-  document.getElementById('scan-status-msg').textContent = '';
-  document.getElementById('confirm-btn').classList.remove('ready');
-  document.getElementById('manual-input').value = '';
-
-  showScreen('screen-scan');
-  renderReceiveScanList();
-  startScanner();
-  setTimeout(function(){ document.getElementById('manual-input').focus(); }, 800);
-}
-
-// ── CARTON CHECKLIST ──────────────────────────────
-function renderReceiveScanList() {
-  var feed = document.getElementById('scan-feed');
-  feed.innerHTML = '';
-  var scannedBarcodes = _scans.map(function(s){ return s.barcode; });
-
-  if (_allCartons.length) {
-    // Main header
-    var hdr = document.createElement('div');
-    hdr.style.cssText = 'padding:.5rem 1rem 0;font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em';
-    hdr.textContent = 'Senarai Karton (' + _allCartons.length + ')';
-    feed.appendChild(hdr);
-
-    // Group cartons by STO (extracted from barcode: C1|STO-NO|...)
-    var stoGroups = {}, stoOrder = [];
-    _allCartons.forEach(function(c) {
-      var parts = c.barcode ? c.barcode.split('|') : [];
-      var stoKey = parts.length >= 2 ? parts[1] : (c.sto_no || 'Unknown');
-      if (!stoGroups[stoKey]) { stoGroups[stoKey] = []; stoOrder.push(stoKey); }
-      stoGroups[stoKey].push(c);
-    });
-
-    stoOrder.forEach(function(stoKey) {
-      var group = stoGroups[stoKey];
-      var scannedCount = group.filter(function(c){ return scannedBarcodes.includes(c.barcode); }).length;
-      var complete = scannedCount === group.length;
-      var stoColor = complete ? 'var(--green)' : 'var(--red,#ef4444)';
-
-      // STO header row
-      var stoHdr = document.createElement('div');
-      stoHdr.setAttribute('data-sto-key', stoKey);
-      stoHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.45rem 1rem;margin-top:.5rem;background:' + (complete ? '#10b98118' : '#ef444418') + ';border-left:3px solid ' + stoColor + ';border-radius:0 6px 6px 0';
-      stoHdr.innerHTML = '<span style="font-size:.75rem;font-weight:800;color:' + stoColor + ';font-family:monospace">' + stoKey + '</span>'
-        + '<span style="font-size:.7rem;font-weight:700;color:' + stoColor + '">' + scannedCount + ' / ' + group.length + '</span>';
-      feed.appendChild(stoHdr);
-
-      group.forEach(function(c, stoIdx) {
-        var isScanned = scannedBarcodes.includes(c.barcode);
-        var scanEntry = isScanned ? _scans.find(function(s){ return s.barcode === c.barcode; }) : null;
-        var timeStr = scanEntry ? fmtTime(scanEntry.time) : '';
-
-        var item = document.createElement('div');
-        item.className = 'scan-item' + (isScanned ? ' ok' : '');
-        item.id = 'carton-row-' + c.barcode.replace(/[^a-z0-9]/gi, '_');
-        item.style.cssText = isScanned ? 'background:#10b98115;border-color:var(--green);transition:background .25s,border-color .25s' : 'transition:background .25s,border-color .25s';
-        item.innerHTML =
-          '<div style="flex:1;min-width:0">'
-          + '<div class="scan-barcode" style="' + (isScanned ? 'color:var(--green)' : '') + '">' + (function(b, idx, total) {
-              var p = b ? b.split('|') : []; if (p.length >= 3) p[2] = (idx+1)+'/'+total; return p.join('|') || b;
-            })(c.barcode, stoIdx, group.length) + '</div>'
-          + '<div class="scan-note">Karton ' + (stoIdx + 1) + ' / ' + group.length
-            + (timeStr ? ' &nbsp;·&nbsp; ' + timeStr : '') + '</div>'
-          + '</div>'
-          + '<div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">'
-          + (isScanned
-              ? '<span style="color:var(--green);font-size:1.2rem;font-weight:700">✓</span>'
-              : '<span style="color:var(--border);font-size:1.1rem">○</span>')
-          + '</div>';
-        feed.appendChild(item);
-      });
-    });
-
+  const expBadge = document.createElement('span');
+  if (expected > 0) {
+    expBadge.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:#6366f120;border:1px solid var(--accent);color:var(--accent)';
+    expBadge.textContent = '📦 ' + expected + ' carton(s) expected';
   } else {
-    var ph = document.createElement('div');
-    ph.style.cssText = 'text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.8rem';
-    ph.textContent = 'Tiada carton didaftarkan. Imbas barcode untuk mula.';
-    feed.appendChild(ph);
+    expBadge.style.cssText = 'font-size:.72rem;font-weight:600;padding:.15rem .55rem;border-radius:20px;background:#33415520;border:1px solid var(--border);color:var(--muted)';
+    expBadge.textContent = '📦 No cartons registered';
   }
+  el.appendChild(expBadge);
+
+  if (scanned > 0) {
+    const scanBadge = document.createElement('span');
+    const color = expected > 0 ? (scanned >= expected ? '#10b981' : '#f59e0b') : '#3b82f6';
+    scanBadge.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:' + color + '20;border:1px solid ' + color + ';color:' + color;
+    scanBadge.textContent = '✅ ' + scanned + (expected > 0 ? '/' + expected : '') + ' scanned';
+    el.appendChild(scanBadge);
+  }
+
+  card.appendChild(el);
+}
+
+async function loadDeliveryCartonBadge(card) {
+  if (!_trip || !_trip.do_no) return;
+  const [scanRes, cartonRes] = await Promise.all([
+    sb.from('carton_scans').select('id', { count: 'exact', head: true }).eq('trip_id', _trip.id),
+    sb.from('cartons').select('id', { count: 'exact', head: true }).eq('do_no', _trip.do_no)
+  ]);
+  const scanned = scanRes.count || 0;
+  const expected = cartonRes.count || 0;
+  if (scanned < 1 && expected < 1) return;
+  const el = document.createElement('div');
+  el.style.cssText = 'margin-top:.4rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap';
+  if (scanned > 0) {
+    const color = expected > 0 ? (scanned >= expected ? '#10b981' : '#f59e0b') : '#3b82f6';
+    const b = document.createElement('span');
+    b.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:' + color + '20;border:1px solid ' + color + ';color:' + color;
+    b.textContent = '📦 ' + scanned + (expected > 0 ? '/' + expected : '') + ' carton(s) delivered';
+    el.appendChild(b);
+  }
+  card.appendChild(el);
+}
+
+// ── SCAN SCREEN ──────────────────────────────────
+async function openScan() {
+  if (!_trip) return;
+  _scans = [];
+  _regCartons = [];
+
+  // Load existing scans in parallel with carton fetch
+  const existRes = await sb.from('carton_scans').select('id, barcode, scanned_at').eq('trip_id', _trip.id).order('scanned_at', { ascending: false });
+  (existRes.data || []).forEach(function(s){ _scans.push({ barcode: s.barcode, time: new Date(s.scanned_at), dbId: s.id }); });
+
+  // Fetch cartons: by do_no AND by all batch_nos (for pre-DO printed labels), then merge unique
+  let regData = [];
+  if (_trip.do_no) {
+    const { data: byDo } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').eq('do_no', _trip.do_no).order('carton_no');
+    regData = byDo || [];
+
+    // Also fetch cartons by batch_no for ALL requests in this DO (pre-DO prints may not have do_no set)
+    const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', _trip.do_no);
+    const bkeys = (sr || []).map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
+    if (bkeys.length) {
+      const { data: byBatch } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').in('batch_no', bkeys).order('carton_no');
+      if (byBatch && byBatch.length) {
+        // Merge: add any carton not already in regData (by id)
+        const existingIds = new Set(regData.map(function(c){ return c.id; }));
+        (byBatch || []).forEach(function(c){ if (!existingIds.has(c.id)) regData.push(c); });
+        regData.sort(function(a,b){ return a.carton_no - b.carton_no; });
+      }
+    }
+  }
+  _regCartons = regData;
+
+  document.getElementById('scan-do').textContent = _trip.do_no || '';
+  showScreen('screen-scan');
+  renderScanList();
+  updateScanCount();
+  startScanner();
+
+  setTimeout(function(){ document.getElementById('manual-input').focus(); }, 600);
 }
 
 function closeScan() {
   stopScanner();
-  _batchDeliveries = [];
   showScreen('screen-home');
-  loadDeliveries();
+  loadTrip(); // refresh scan count badge
 }
 
 // ── CAMERA SCANNER ────────────────────────────────
 function startScanner() {
   stopScanner();
-  var config = { fps: 10, qrbox: { width: 220, height: 150 }, aspectRatio: 1.7, rememberLastUsedCamera: true };
+  const config = { fps: 10, qrbox: { width: 200, height: 140 }, aspectRatio: 1.5, rememberLastUsedCamera: true };
   _scanner = new Html5Qrcode('reader');
   _scanner.start({ facingMode: 'environment' }, config, function(decoded) {
     processBarcode(decoded);
@@ -804,10 +792,10 @@ function stopScanner() {
   }
 }
 
-// ── MANUAL INPUT ──────────────────────────────────
+// ── MANUAL / EXTERNAL SCANNER ─────────────────────
 function addManualScan() {
-  var inp = document.getElementById('manual-input');
-  var val = inp.value.trim();
+  const inp = document.getElementById('manual-input');
+  const val = inp.value.trim();
   if (!val) return;
   processBarcode(val);
   inp.value = '';
@@ -815,464 +803,1270 @@ function addManualScan() {
 }
 
 document.addEventListener('DOMContentLoaded', function(){
-  var inp = document.getElementById('manual-input');
+  const inp = document.getElementById('manual-input');
   inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') addManualScan(); });
-
-  // Auto-login if session saved
-  var saved = localStorage.getItem('receive_user');
-  if (saved) {
-    try {
-      _user = JSON.parse(saved);
-      if (!_user.boutique_id) {
-        // Admin with no boutique selected yet
-        showScreen('screen-boutique-pick');
-        loadBoutiquePicker();
-      } else {
-        document.getElementById('greet-name').textContent = _user.full_name || _user.username;
-        document.getElementById('greet-boutique').textContent = _user.boutique ? _user.boutique.name : '—';
-        if (_user.role === 'admin') document.getElementById('btn-change-boutique').style.display = 'inline-flex';
-        showScreen('screen-home');
-        loadDeliveries();
-      }
-    } catch(e){ localStorage.removeItem('receive_user'); }
-  }
 });
-
-// ── UPDATE STO HEADER COLORS AFTER EACH SCAN ─────
-function updateStoHeaders() {
-  var scannedBarcodes = _scans.map(function(s){ return s.barcode; });
-  // Build stoKey → { total, scanned } from _allCartons
-  var stoGroups = {};
-  _allCartons.forEach(function(c) {
-    var parts = c.barcode ? c.barcode.split('|') : [];
-    var stoKey = parts.length >= 2 ? parts[1] : (c.sto_no || 'Unknown');
-    if (!stoGroups[stoKey]) stoGroups[stoKey] = { total: 0, scanned: 0 };
-    stoGroups[stoKey].total++;
-    if (scannedBarcodes.includes(c.barcode)) stoGroups[stoKey].scanned++;
-  });
-  document.querySelectorAll('[data-sto-key]').forEach(function(hdr) {
-    var key = hdr.getAttribute('data-sto-key');
-    var g = stoGroups[key];
-    if (!g) return;
-    var complete = g.total > 0 && g.scanned === g.total;
-    var color = complete ? 'var(--green)' : '#ef4444';
-    hdr.style.background = complete ? '#10b98118' : '#ef444418';
-    hdr.style.borderLeftColor = color;
-    var spans = hdr.querySelectorAll('span');
-    if (spans[0]) spans[0].style.color = color;
-    if (spans[1]) { spans[1].textContent = g.scanned + ' / ' + g.total; spans[1].style.color = color; }
-  });
-}
 
 // ── PROCESS BARCODE ───────────────────────────────
 async function processBarcode(barcode) {
-  if (!barcode || !_currentDelivery) return;
-  var beep = document.getElementById('beep-dot');
+  if (!barcode || !_trip) return;
+  const beep = document.getElementById('beep-dot');
 
-  // Flash
-  beep.className = 'beep-dot';
-  void beep.offsetWidth;
+  // Flash indicator
+  beep.classList.add('active');
+  setTimeout(function(){ beep.classList.remove('active'); }, 300);
 
-  // Duplicate check
-  var isDup = _scans.some(function(s){ return s.barcode === barcode; });
-  if (isDup) {
-    beep.classList.add('dup');
-    addScanItem(barcode, 'dup', 'Sudah diimbas sebelum ini');
-    showToast('⚠️ Karton sudah diimbas!');
-    return;
-  }
+  // Check duplicate
+  const isDup = _scans.some(function(s){ return s.barcode === barcode; });
+  if (isDup) { flashDuplicate(barcode); return; }
 
-  // Validate against registered cartons — exact match first
-  var matched = _allCartons.find(function(c){ return c.barcode === barcode; });
+  // Validate against registered cartons table — exact match first
+  let { data: regCarton } = await sb.from('cartons')
+    .select('id, do_no, carton_no, total_cartons, barcode')
+    .eq('barcode', barcode)
+    .eq('status', 'registered')
+    .limit(1);
 
-  // Fuzzy fallback in _allCartons: match on C{n}|{STO}| prefix, ignore x/y segment
-  if (!matched && barcode.includes('|')) {
+  // Fuzzy fallback: match on C{n}|{STO}| prefix, ignoring x/y segment
+  // Handles case where label barcode has different x/y than DB (e.g. label=1/2, DB=3/4)
+  if ((!regCarton || !regCarton.length) && barcode.includes('|')) {
     var scanParts = barcode.split('|');
     if (scanParts.length >= 2) {
       var bPrefix = scanParts[0] + '|' + scanParts[1] + '|';
-      matched = _allCartons.find(function(c){ return c.barcode && c.barcode.startsWith(bPrefix); });
+      const { data: fuzzy } = await sb.from('cartons')
+        .select('id, do_no, carton_no, total_cartons, barcode')
+        .like('barcode', bPrefix + '%')
+        .eq('status', 'registered')
+        .limit(1);
+      if (fuzzy && fuzzy.length) {
+        regCarton = fuzzy;
+        barcode = fuzzy[0].barcode; // normalise to DB barcode for consistency
+      }
     }
   }
 
-  if (!matched) {
-    // Try exact lookup in DB in case cartons were registered after page load
-    var { data: found } = await sb.from('cartons')
-      .select('id, barcode, carton_no, total_cartons, do_no, batch_no')
-      .eq('barcode', barcode).eq('status','registered').limit(1);
-    if (found && found.length) matched = found[0];
+  // Re-check duplicate after normalisation (label x/y may differ from DB)
+  if (regCarton && regCarton.length && _scans.some(function(s){ return s.barcode === barcode; })) {
+    flashDuplicate(barcode);
+    return;
   }
 
-  // Fuzzy DB fallback: match on prefix
-  if (!matched && barcode.includes('|')) {
-    var scanParts2 = barcode.split('|');
-    if (scanParts2.length >= 2) {
-      var bPrefix2 = scanParts2[0] + '|' + scanParts2[1] + '|';
-      var { data: fuzzyDb } = await sb.from('cartons')
-        .select('id, barcode, carton_no, total_cartons, do_no, batch_no')
-        .like('barcode', bPrefix2 + '%').eq('status','registered').limit(1);
-      if (fuzzyDb && fuzzyDb.length) matched = fuzzyDb[0];
+  const isValid = regCarton && regCarton.length > 0;
+
+  // If DO is set, also check barcode belongs to this trip's DO
+  let wrongDO = false;
+  if (isValid && _trip.do_no && regCarton[0].do_no && regCarton[0].do_no !== _trip.do_no) {
+    wrongDO = true;
+  }
+
+  if (!isValid) {
+    // Show unregistered warning
+    const statusEl = document.getElementById('scan-status');
+    if (statusEl) {
+      statusEl.textContent = '⚠️ Carton not registered! Barcode: ' + barcode;
+      statusEl.style.color = '#ef4444';
+      setTimeout(function(){ statusEl.textContent = ''; }, 3000);
     }
-  }
-
-  // Normalise barcode to DB value so scan feed & checklist match
-  if (matched && matched.barcode && matched.barcode !== barcode) barcode = matched.barcode;
-
-  // Re-check duplicate after normalisation (label 1/2 and label 3/4 same carton)
-  if (matched && _scans.some(function(s){ return s.barcode === barcode; })) {
-    beep.classList.add('dup');
-    addScanItem(barcode, 'dup', 'Sudah diimbas sebelum ini');
-    showToast('⚠️ Karton sudah diimbas!');
     return;
   }
 
-  if (!matched) {
-    beep.classList.add('error');
-    addScanItem(barcode, 'err', '❌ Karton tidak dikenali atau bukan untuk penghantaran ini');
-    showToast('❌ Karton tidak sah!');
+  if (wrongDO) {
+    const statusEl = document.getElementById('scan-status');
+    if (statusEl) {
+      statusEl.textContent = '⚠️ Carton belongs to different DO!';
+      statusEl.style.color = '#f59e0b';
+      setTimeout(function(){ statusEl.textContent = ''; }, 3000);
+    }
     return;
   }
 
-  // Valid carton
-  beep.classList.add('success');
-  _scans.push({ barcode: barcode, carton_no: matched.carton_no, total: matched.total_cartons, time: new Date() });
-  showToast('✅ Karton ' + (matched.carton_no || barcode) + ' disahkan');
+  // Save to Supabase
+  const { data, error } = await sb.from('carton_scans').insert({
+    trip_id: _trip.id,
+    do_no: _trip.do_no,
+    barcode: barcode,
+    driver_id: _driver.id,
+    scanned_at: new Date().toISOString()
+  }).select('id').single();
 
-  // Re-render checklist (updates STO headers + row colors in one pass)
-  renderReceiveScanList();
-  // Scroll the just-scanned row into view
-  var rowId = 'carton-row-' + barcode.replace(/[^a-z0-9]/gi, '_');
-  var row = document.getElementById(rowId);
-  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (error) { console.error(error); return; }
 
-  // Update counter
-  var total = _allCartons.length || _currentDelivery.expectedCartons || '?';
-  document.getElementById('scan-count').textContent = _scans.length;
-  document.getElementById('scan-total').textContent = total;
+  _scans.unshift({ barcode, time: new Date(), dbId: data ? data.id : null });
 
-  // Check if all done
-  var expectedCount = _allCartons.length || _currentDelivery.expectedCartons || 0;
-  if (expectedCount > 0 && _scans.length >= expectedCount) {
-    document.getElementById('scan-status-msg').textContent = '🎉 Semua karton disahkan!';
-    document.getElementById('confirm-btn').classList.add('ready');
-    showToast('🎉 Semua karton diterima! Tekan Sahkan.');
-  } else {
-    var remaining = expectedCount > 0 ? (expectedCount - _scans.length) : '?';
-    document.getElementById('scan-status-msg').textContent = remaining + ' karton lagi';
+  // If not in _regCartons yet (registered after openScan), add it
+  if (!_regCartons.find(function(c){ return c.barcode === barcode; })) {
+    _regCartons.push({
+      id: regCarton[0].id, barcode: barcode,
+      carton_no: regCarton[0].carton_no, total_cartons: regCarton[0].total_cartons
+    });
   }
+
+  renderScanList();
+  updateScanCount();
 }
 
-function addScanItem(barcode, type, note) {
-  var feed = document.getElementById('scan-feed');
-  var item = document.createElement('div');
-  item.className = 'scan-item ' + (type === 'ok' ? 'ok' : type === 'dup' ? '' : 'err');
-  var icon = type === 'ok' ? '✅' : type === 'dup' ? '⚠️' : '❌';
-  var time = fmtTime(new Date());
-  item.innerHTML = '<div class="scan-icon">' + icon + '</div>'
-    + '<div class="scan-info"><div class="scan-barcode">' + barcode + '</div><div class="scan-note">' + note + '</div></div>'
-    + '<div class="scan-time">' + time + '</div>';
-  feed.insertBefore(item, feed.firstChild);
-}
-
-// ── SIGNATURE PAD ─────────────────────────────────
-let _sigDrawing = false;
-let _sigHasSig = false;
-
-function openSignatureModal(skipScan) {
-  if (!_currentDelivery && !_batchDeliveries.length) return;
-  // Update title for batch vs single
-  var titleEl = document.querySelector('.sig-title');
-  if (titleEl) {
-    titleEl.textContent = _batchDeliveries.length > 1
-      ? '✍️ Terima ' + _batchDeliveries.length + ' Order'
-      : '✍️ Pengesahan Penerimaan';
-  }
-  document.getElementById('sig-modal').style.display = 'flex';
-  document.getElementById('sig-name').value = '';
-  // Init canvas after it's visible
-  setTimeout(function() {
-    var canvas = document.getElementById('sig-canvas');
-    canvas.width = canvas.offsetWidth;
-    _sigHasSig = false;
-    var ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // Mouse events
-    canvas.onmousedown = function(e){ _sigDrawing = true; var p = getSigPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
-    canvas.onmousemove = function(e){ if (!_sigDrawing) return; drawSig(ctx, e); };
-    canvas.onmouseup = function(){ _sigDrawing = false; };
-    canvas.onmouseleave = function(){ _sigDrawing = false; };
-    // Touch events
-    canvas.ontouchstart = function(e){ e.preventDefault(); _sigDrawing = true; var p = getSigPos(e.touches[0]); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
-    canvas.ontouchmove = function(e){ e.preventDefault(); if (!_sigDrawing) return; drawSig(ctx, e.touches[0]); };
-    canvas.ontouchend = function(){ _sigDrawing = false; };
-  }, 50);
-}
-
-function getSigPos(e) {
-  var canvas = document.getElementById('sig-canvas');
-  var rect = canvas.getBoundingClientRect();
-  return {
-    x: (e.clientX - rect.left) * (canvas.width / rect.width),
-    y: (e.clientY - rect.top) * (canvas.height / rect.height)
-  };
-}
-
-function drawSig(ctx, e) {
-  var p = getSigPos(e);
-  ctx.strokeStyle = '#1e293b';
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.lineTo(p.x, p.y);
-  ctx.stroke();
-  _sigHasSig = true;
-}
-
-function clearSig() {
-  var canvas = document.getElementById('sig-canvas');
-  var ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  _sigHasSig = false;
-}
-
-function closeSignatureModal() {
-  document.getElementById('sig-modal').style.display = 'none';
-}
-
-async function submitSignature() {
-  var name = document.getElementById('sig-name').value.trim();
-  if (!name) { showToast('⚠️ Sila masukkan nama penerima', 2000); return; }
-  if (!_sigHasSig) { showToast('⚠️ Sila tandatangan dahulu', 2000); return; }
-  var canvas = document.getElementById('sig-canvas');
-  var sigBase64 = canvas.toDataURL('image/png');
-  closeSignatureModal();
-  await confirmReceive(name, sigBase64);
-}
-
-// ── CONFIRM RECEIVE ───────────────────────────────
-function toggleSelectAll(checked) {
-  document.querySelectorAll('.order-chk').forEach(function(chk){ chk.checked = checked; });
-  updateBatchBtn();
-}
-
-function updateBatchBtn() {
-  var checked = document.querySelectorAll('.order-chk:checked').length;
-  var bar = document.getElementById('batch-receive-bar');
-  var cnt = document.getElementById('batch-count');
-  if (bar) bar.style.display = checked > 0 ? 'block' : 'none';
-  if (cnt) cnt.textContent = checked;
-  // Sync "pilih semua" checkbox
-  var all = document.querySelectorAll('.order-chk').length;
-  var chkAll = document.getElementById('chk-all');
-  if (chkAll) chkAll.checked = checked === all && all > 0;
-}
-
-function startBatchReceive() {
-  var selected = [];
-  document.querySelectorAll('.order-chk:checked').forEach(function(chk){
-    var card = chk.closest('.delivery-card');
-    if (card) {
-      var k = card.getAttribute('data-key');
-      if (k && _cardPayloads[k]) selected.push(_cardPayloads[k]);
+function flashDuplicate(barcode) {
+  // Find item and flash it
+  const items = document.querySelectorAll('.scan-item');
+  items.forEach(function(item){
+    if (item.querySelector('.scan-barcode') && item.querySelector('.scan-barcode').textContent === barcode) {
+      item.style.background = '#f59e0b30';
+      setTimeout(function(){ item.style.background = ''; }, 800);
     }
   });
-  if (!selected.length) { showToast('Pilih order dahulu', 2000); return; }
-
-  _batchDeliveries = selected;
-  _currentDelivery = selected[0];
-  _scans = [];
-  _allCartons = []; // no pre-fetch — scan or skip
-
-  var label = selected.length + ' Order (' + selected.map(function(s){ return s.doNo || s.batchNo; }).join(', ') + ')';
-  document.getElementById('scan-do-label').textContent = label;
-  document.getElementById('scan-count').textContent = '0';
-  document.getElementById('scan-total').textContent = '⏳';
-  document.getElementById('scan-status-msg').textContent = '';
-  document.getElementById('confirm-btn').classList.remove('ready');
-  document.getElementById('manual-input').value = '';
-  // Hide batch button while on scan screen
-  var bar = document.getElementById('batch-receive-bar');
-  if (bar) bar.style.display = 'none';
-  showScreen('screen-scan');
-  renderReceiveScanList();
-  startScanner();
-  // Fetch cartons in background after screen is shown
-  (async function() {
-    var allDoNos = selected.filter(function(s){ return s.doNo; }).map(function(s){ return s.doNo; });
-    var allBatchNos = selected.filter(function(s){ return s.batchNo && !s.doNo; }).map(function(s){ return s.batchNo; });
-    try {
-      if (allDoNos.length) {
-        var resDC = await sb.from('cartons').select('id,barcode,carton_no,total_cartons,do_no,batch_no').in('do_no', allDoNos);
-        _allCartons = _allCartons.concat(resDC.data || []);
-      }
-      if (allBatchNos.length) {
-        var resBC = await sb.from('cartons').select('id,barcode,carton_no,total_cartons,do_no,batch_no').in('batch_no', allBatchNos);
-        _allCartons = _allCartons.concat(resBC.data || []);
-      }
-    } catch(e) { console.error('batch carton fetch:', e); }
-    document.getElementById('scan-total').textContent = _allCartons.length || '?';
-    renderReceiveScanList();
-  })();
 }
 
-var _batchDeliveries = [];
+function updateScanCount() {
+  document.getElementById('scan-count').textContent = _scans.length;
+  const btn = document.getElementById('depart-btn');
+  btn.disabled = false; // allow depart even with 0 scans (with confirmation)
+}
 
-async function confirmBatchReceive() {
-  var name = (document.getElementById('batch-receiver-name').value || '').trim();
-  if (!name) { alert('Sila masukkan nama penerima.'); return; }
-  var btn = document.querySelector('#batch-name-overlay button:last-child');
-  btn.disabled = true; btn.textContent = '⏳ Memproses...';
+function renderScanList() {
+  const list = document.getElementById('scan-list');
+  list.innerHTML = '';
 
-  var who = _user ? (_user.full_name || _user.username) : 'Staff';
-  var now = new Date().toISOString();
+  const scannedBarcodes = _scans.map(function(s){ return s.barcode; });
 
-  try {
-    for (var i = 0; i < _batchDeliveries.length; i++) {
-      var delivery = _batchDeliveries[i];
-      var reqIds = delivery.ids || [];
-      if (!reqIds.length && delivery.doNo) {
-        var { data: foundReqs } = await sb.from('stock_requests').select('id').eq('do_no', delivery.doNo);
-        reqIds = (foundReqs || []).map(function(r){ return r.id; });
-      }
-      if (reqIds.length) {
-        await sb.from('stock_requests').update({ status: 'Received' }).in('id', reqIds);
-        await Promise.all(reqIds.map(function(id){
-          var note = 'Penerimaan batch | DO: ' + (delivery.doNo || delivery.batchNo) + ' | Diterima oleh: ' + name;
-          return sb.from('request_status_log').insert({ request_id: id, status: 'Received', note: note, changed_by: who });
-        }));
-      }
-      var podUpdate = { status: 'Arrived', pod_confirmed_at: now, pod_confirmed_by: who, receiver_name: name };
-      if (delivery.tripId) {
-        await sb.from('fleet_trips').update(podUpdate).eq('id', delivery.tripId);
-      } else if (delivery.doNo) {
-        await sb.from('fleet_trips').update(podUpdate).eq('do_no', delivery.doNo);
-      }
-    }
-    document.getElementById('batch-name-overlay').remove();
-    var bar = document.getElementById('batch-receive-bar');
-    if (bar) bar.remove();
-    showToast('✅ ' + _batchDeliveries.length + ' order berjaya diterima!', 3000);
-    _batchDeliveries = [];
-    setTimeout(loadDeliveries, 1500);
-  } catch(err) {
-    console.error(err);
-    showToast('❌ Ralat! Cuba lagi.', 3000);
-    btn.disabled = false; btn.textContent = '✅ Sahkan Terima';
+  // Show registered carton checklist if available
+  if (_regCartons.length) {
+    // Main header
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:.5rem 1rem;font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em';
+    header.textContent = 'Carton List (' + _regCartons.length + ')';
+    list.appendChild(header);
+
+    // Group cartons by STO (sto_no field in barcode: C{n}|{STO}|...)
+    var stoGroups = {}; // { stoKey: [cartons] }
+    var stoOrder = [];
+    _regCartons.forEach(function(c) {
+      // Extract STO from barcode: C1|WH-ONLINE-PTX3CM|1/8|...  → WH-ONLINE-PTX3CM
+      var parts = c.barcode ? c.barcode.split('|') : [];
+      var stoKey = parts.length >= 2 ? parts[1] : ('STO-' + (c.sto_no || 'Unknown'));
+      if (!stoGroups[stoKey]) { stoGroups[stoKey] = []; stoOrder.push(stoKey); }
+      stoGroups[stoKey].push(c);
+    });
+
+    stoOrder.forEach(function(stoKey) {
+      var group = stoGroups[stoKey];
+      var scannedCount = group.filter(function(c){ return scannedBarcodes.includes(c.barcode); }).length;
+      var complete = scannedCount === group.length;
+      var stoColor = complete ? '#10b981' : '#ef4444';
+
+      // STO header row
+      var stoHdr = document.createElement('div');
+      stoHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.45rem 1rem;margin-top:.5rem;background:' + stoColor + '18;border-left:3px solid ' + stoColor + ';border-radius:0 6px 6px 0';
+      stoHdr.innerHTML = '<span style="font-size:.75rem;font-weight:800;color:' + stoColor + ';font-family:monospace">' + stoKey + '</span>'
+        + '<span style="font-size:.7rem;font-weight:700;color:' + stoColor + '">' + scannedCount + ' / ' + group.length + '</span>';
+      list.appendChild(stoHdr);
+
+      group.forEach(function(c, grpIdx){
+        const isScanned = scannedBarcodes.includes(c.barcode);
+        const scanEntry = isScanned ? _scans.find(function(s){ return s.barcode === c.barcode; }) : null;
+        const item = document.createElement('div');
+        item.className = 'scan-item';
+        item.style.cssText = 'transition:background .25s,border-color .25s;' + (isScanned ? 'background:#10b98115;border-color:#10b981' : '');
+
+        const timeStr = scanEntry ? scanEntry.time.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+        const scanIdx = isScanned ? _scans.findIndex(function(s){ return s.barcode === c.barcode; }) : -1;
+
+        // Rewrite barcode display: segment 3 = per-STO position (grpIdx+1/group.length)
+        var bParts = c.barcode ? c.barcode.split('|') : [];
+        if (bParts.length >= 3) bParts[2] = (grpIdx+1) + '/' + group.length;
+        var displayBarcode = bParts.length ? bParts.join('|') : (c.barcode || '—');
+
+        item.innerHTML =
+          '<div style="flex:1;min-width:0">'
+          + '<div class="scan-barcode" style="' + (isScanned ? 'color:#10b981' : '') + '">' + displayBarcode + '</div>'
+          + '<div class="scan-time">Carton ' + (grpIdx+1) + ' / ' + group.length + (timeStr ? ' &nbsp;·&nbsp; ' + timeStr : '') + '</div>'
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">'
+          + (isScanned
+              ? '<span style="color:#10b981;font-size:1.1rem;font-weight:700">✓</span>'
+                + '<button class="delete-scan" data-idx="' + scanIdx + '" style="opacity:.5">✕</button>'
+              : '<span style="color:var(--border);font-size:1rem">○</span>')
+          + '</div>';
+        list.appendChild(item);
+      });
+    });
+
+  } else if (_scans.length) {
+    // Fallback: show scanned list if no registered cartons found
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:.5rem 1rem;font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em';
+    header.textContent = 'Scanned (' + _scans.length + ')';
+    list.appendChild(header);
+
+    _scans.forEach(function(s, idx){
+      const item = document.createElement('div');
+      item.className = 'scan-item';
+      item.style.cssText = 'background:#10b98115;border-color:#10b981';
+      const timeStr = s.time.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      item.innerHTML =
+        '<div style="flex:1;min-width:0"><div class="scan-barcode" style="color:#10b981">' + s.barcode + '</div>'
+        + '<div class="scan-time">' + timeStr + '</div></div>'
+        + '<div style="display:flex;align-items:center;gap:.5rem">'
+        + '<span style="color:#10b981;font-size:1.1rem">✓</span>'
+        + '<button class="delete-scan" data-idx="' + idx + '">✕</button>'
+        + '</div>';
+      list.appendChild(item);
+    });
+
+  } else {
+    list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">' + t('scanStatus') + '</div>';
   }
+
+  list.querySelectorAll('.delete-scan').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const i = parseInt(btn.getAttribute('data-idx'));
+      deleteScan(i);
+    });
+  });
 }
 
-async function confirmReceive(receiverName, signatureImage) {
-  if (!_currentDelivery && !_batchDeliveries.length) return;
-  var who = _user ? (_user.full_name || _user.username) : 'Staff';
-  var now = new Date().toISOString();
+async function deleteScan(idx) {
+  const s = _scans[idx];
+  if (s && s.dbId) await sb.from('carton_scans').delete().eq('id', s.dbId);
+  _scans.splice(idx, 1);
+  renderScanList();
+  updateScanCount();
+}
 
-  // ── BATCH MODE ─────────────────────────────────────
-  if (_batchDeliveries.length > 1) {
-    var bar = document.getElementById('batch-receive-bar');
-    if (bar) bar.remove();
-    try {
-      for (var bi = 0; bi < _batchDeliveries.length; bi++) {
-        var bdel = _batchDeliveries[bi];
-        var bIds = bdel.ids || [];
-        if (!bIds.length && bdel.doNo) {
-          var { data: bReqs } = await sb.from('stock_requests').select('id').eq('do_no', bdel.doNo);
-          bIds = (bReqs || []).map(function(r){ return r.id; });
+// ── GPS TRACKING ─────────────────────────────────
+let _gpsWatchId = null;
+
+function startGPS() {
+  if (!navigator.geolocation) return;
+  const gpsEl = document.getElementById('gps-status');
+  // Use watchPosition for continuous updates
+  _gpsWatchId = navigator.geolocation.watchPosition(
+    async function(pos) {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      // Save to fleet_trips
+      if (_trip && _trip.id) {
+        await sb.from('fleet_trips').update({ lat: lat, lng: lng, last_location_update: new Date().toISOString() }).eq('id', _trip.id);
+      }
+      // Update map marker
+      if (_driverMap) {
+        const driverIcon = L.divIcon({ className:'', html:'<div style="width:14px;height:14px;background:#f97316;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.5)"></div>', iconSize:[14,14], iconAnchor:[7,7] });
+        if (_driverMarker) {
+          _driverMarker.setLatLng([lat, lng]);
+        } else {
+          _driverMarker = L.marker([lat, lng], { icon: driverIcon }).addTo(_driverMap).bindPopup('<b>📍 ' + t('yourLocation') + '</b>');
+          _driverMap.setView([lat, lng], 14);
         }
-        if (bIds.length) {
-          await sb.from('stock_requests').update({ status: 'Received' }).in('id', bIds);
-          await Promise.all(bIds.map(function(id){
-            var note = 'Penerimaan batch | DO: ' + (bdel.doNo || bdel.batchNo) + ' | Diterima oleh: ' + (receiverName || who);
-            return sb.from('request_status_log').insert({ request_id: id, status: 'Received', note: note, changed_by: who });
-          }));
-        }
-        var bPod = { status: 'Arrived', pod_confirmed_at: now, pod_confirmed_by: who, receiver_name: receiverName || null, signature_image: signatureImage || null };
-        if (bdel.tripId) {
-          await sb.from('fleet_trips').update(bPod).eq('id', bdel.tripId);
-        } else if (bdel.doNo) {
-          await sb.from('fleet_trips').update(bPod).eq('do_no', bdel.doNo);
+        // Draw route line to destination
+        if (_destCoords) {
+          if (_routeLine) _driverMap.removeLayer(_routeLine);
+          _routeLine = L.polyline([[lat, lng], [_destCoords.lat, _destCoords.lng]], { color:'#3b82f6', weight:3, dashArray:'6 4' }).addTo(_driverMap);
+          _driverMap.fitBounds([[lat, lng], [_destCoords.lat, _destCoords.lng]], { padding:[30,30] });
         }
       }
-      showToast('✅ ' + _batchDeliveries.length + ' order berjaya diterima!', 3000);
-      _batchDeliveries = [];
-      setTimeout(function(){ stopScanner(); showScreen('screen-home'); loadDeliveries(); }, 1500);
-    } catch(err) {
-      console.error(err);
-      showToast('❌ Ralat! Cuba lagi.', 3000);
+      if (gpsEl) { gpsEl.textContent = t('gpsOn'); gpsEl.className = 'gps-on'; }
+    },
+    function(err) {
+      console.warn('GPS error:', err.message);
+      if (gpsEl) { gpsEl.textContent = t('gpsOff'); gpsEl.className = 'gps-off'; }
+    },
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+  );
+}
+
+function stopGPS() {
+  if (_gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(_gpsWatchId);
+    _gpsWatchId = null;
+  }
+  const gpsEl = document.getElementById('gps-status');
+  if (gpsEl) { gpsEl.textContent = t('gpsOff'); gpsEl.className = 'gps-off'; }
+}
+
+// ── DEPART ───────────────────────────────────────
+async function doDepart() {
+  const n = _scans.length;
+  const msg = n === 0 ? t('confirmDepartZero') : t('confirmDepart', { n });
+  if (!confirm(msg)) return;
+  const btn = document.getElementById('depart-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>' + t('loginLoading');
+  stopScanner();
+  const { error } = await sb.from('fleet_trips').update({ status:'Departed', departure_time: new Date().toISOString() }).eq('id', _trip.id);
+  if (error) { alert(error.message); btn.disabled = false; btn.textContent = t('departBtn'); return; }
+  // Update stock_requests to In Transit so it disappears from fleet Pick Up tab
+  if (_trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', _trip.do_no).eq('status', 'Pending Pick Up');
+    if (reqs && reqs.length) {
+      const reqIds = reqs.map(r => r.id);
+      await sb.from('stock_requests').update({ status: 'In Transit' }).in('id', reqIds);
+      const logNote = 'Driver departed | Driver: ' + _driver.name + ' | Cartons scanned: ' + _scans.length + ' | DO: ' + _trip.do_no;
+      await Promise.all(reqIds.map(function(id) {
+        return sb.from('request_status_log').insert({ request_id: id, status: 'In Transit', note: logNote, changed_by: _driver.name });
+      }));
     }
+  }
+  _trip.status = 'Departed';
+  showScreen('screen-home');
+  switchTripTab('delivery');
+  startGPS();
+}
+
+// ── LEG 2: OPEN SCAN FROM DELIVERY TAB ───────────
+function openScanForTrip(tripId) {
+  const trip = _allTrips.find(function(t){ return t.id === tripId; });
+  if (!trip) return;
+  _trip = trip;
+  openScan();
+}
+
+// ── LEG 2: DEPART WITHOUT SCAN (SKIP) ────────────
+async function departTrip(tripId) {
+  if (!confirm('Depart without scanning cartons?')) return;
+  const trip = _allTrips.find(function(t){ return t.id === tripId; });
+  if (!trip) return;
+  _trip = trip;
+  const { error } = await sb.from('fleet_trips').update({ status:'Departed', departure_time: new Date().toISOString() }).eq('id', tripId);
+  if (error) { alert(error.message); return; }
+  if (trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', trip.do_no);
+    if (reqs && reqs.length) {
+      const reqIds = reqs.map(function(r){ return r.id; });
+      const logNote = 'Driver departed (leg 2) | Driver: ' + _driver.name + ' | DO: ' + trip.do_no;
+      await Promise.all(reqIds.map(function(id) {
+        return sb.from('request_status_log').insert({ request_id: id, status: 'In Transit', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  startGPS();
+  loadTrip();
+}
+
+// ── DROP AT WAREHOUSE ────────────────────────────
+async function doDropWarehouse() {
+  if (!_trip) return;
+  if (!confirm('Please confirm drop-off at the warehouse.')) return;
+  stopGPS();
+  const _now = new Date().toISOString();
+  const { error } = await sb.from('fleet_trips').update({
+    status: 'At Warehouse',
+    arrival_time: _now,
+    pod_confirmed_at: _now,
+    pod_confirmed_by: _driver ? _driver.name : 'Driver'
+  }).eq('id', _trip.id);
+  if (error) { alert('Error: ' + error.message); return; }
+  // Update stock_requests to 'In Transit At Warehouse' and log
+  if (_trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', _trip.do_no);
+    if (reqs && reqs.length) {
+      const reqIds = reqs.map(r => r.id);
+      await sb.from('stock_requests').update({ status: 'In Transit At Warehouse' }).in('id', reqIds);
+      const logNote = 'Dropped at warehouse | Driver: ' + _driver.name + ' | DO: ' + _trip.do_no;
+      await Promise.all(reqIds.map(function(id) {
+        return sb.from('request_status_log').insert({ request_id: id, status: 'In Transit At Warehouse', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  // Free vehicle & driver
+  if (_trip.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', _trip.vehicle_id);
+  await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+  // Show confirmation
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  const done = document.createElement('div');
+  done.style.cssText = 'text-align:center;padding:2rem;width:100%;max-width:420px';
+  done.innerHTML = '<div style="font-size:3rem">🏭</div>'
+    + '<div style="font-weight:800;font-size:1.1rem;margin:.5rem 0">Dropped at Warehouse</div>'
+    + '<div style="font-size:.8rem;color:var(--muted)">' + (_trip.do_no || '') + ' has been delivered to the warehouse.<br>Please await further delivery assignment.</div>';
+  content.appendChild(done);
+  _trip = null;
+  setTimeout(loadTrip, 2000);
+}
+
+// ── DIRECT DELIVERY (Leg 1 → skip warehouse, wait for POD) ──
+async function doDirectDelivery() {
+  if (!_trip) return;
+  if (!confirm('Please confirm arrival at this destination.\n\nBoutique staff will need to scan cartons to complete delivery.')) return;
+  stopGPS();
+  const { error } = await sb.from('fleet_trips').update({
+    status: 'Arrived',
+    arrival_time: new Date().toISOString()
+  }).eq('id', _trip.id);
+  if (error) { alert('Error: ' + error.message); return; }
+  // Log arrival
+  if (_trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', _trip.do_no);
+    if (reqs && reqs.length) {
+      const logNote = 'Out for delivery | Driver: ' + _driver.name + ' | DO: ' + _trip.do_no;
+      await Promise.all(reqs.map(function(r) {
+        return sb.from('request_status_log').insert({ request_id: r.id, status: 'Out for Delivery', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  // Show waiting screen
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  const waitDiv = document.createElement('div');
+  waitDiv.style.cssText = 'text-align:center;padding:2rem;width:100%;max-width:420px';
+  waitDiv.innerHTML =
+    '<div style="font-size:3rem;margin-bottom:.5rem">📍</div>'
+    + '<div style="font-weight:800;font-size:1.1rem;margin-bottom:.3rem">Delivery Submitted</div>'
+    + '<div style="font-size:.85rem;font-weight:600;color:var(--accent);margin-bottom:.25rem">' + (_trip.destination || '') + '</div>'
+    + '<div style="font-size:.8rem;color:var(--muted);margin-bottom:1.5rem">Awaiting boutique staff to confirm receipt of cartons.</div>'
+    + '<button id="pod-wait-btn" disabled style="width:100%;max-width:420px;padding:.9rem;background:var(--border);color:var(--muted);border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:not-allowed;margin-top:.5rem;opacity:.5">📄 View POD</button>'
+    + '<div style="font-size:.72rem;color:var(--muted);margin-top:.6rem">Button will unlock once boutique staff confirms receipt.</div>';
+  content.appendChild(waitDiv);
+
+  // Poll for POD confirmation
+  const tripId = _trip.id;
+  const tripRef = _trip;
+  const podPoll = setInterval(async function() {
+    const { data } = await sb.from('fleet_trips').select('pod_confirmed_at, pod_confirmed_by, receiver_name, signature_image').eq('id', tripId).single();
+    if (data && data.pod_confirmed_at) {
+      clearInterval(podPoll);
+      // Free vehicle and driver
+      if (tripRef.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', tripRef.vehicle_id);
+      await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+      // Update local trip ref and show POD
+      Object.assign(tripRef, data);
+      _allTrips = _allTrips.filter(function(x){ return x.id !== tripId; });
+      viewPOD(tripId);
+    }
+  }, 5000);
+}
+
+// ── ARRIVED ──────────────────────────────────────
+async function doArrived() {
+  if (!confirm(t('confirmArrive'))) return;
+  stopGPS();
+  const { error } = await sb.from('fleet_trips').update({ status:'Arrived', arrival_time: new Date().toISOString() }).eq('id', _trip.id);
+  if (error) { alert(error.message); return; }
+  if (_trip.vehicle_id) await sb.from('fleet_vehicles').update({ status:'Available' }).eq('id', _trip.vehicle_id);
+  await sb.from('fleet_drivers').update({ status:'Available' }).eq('id', _driver.id);
+  // Log arrival
+  if (_trip.do_no) {
+    const { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', _trip.do_no);
+    if (reqs && reqs.length) {
+      const logNote = 'Driver arrived at destination | Driver: ' + _driver.name + ' | DO: ' + _trip.do_no;
+      await Promise.all(reqs.map(function(r) {
+        return sb.from('request_status_log').insert({ request_id: r.id, status: 'Arrived', note: logNote, changed_by: _driver.name });
+      }));
+    }
+  }
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  _trip = null;
+  renderTrip();
+}
+
+// ═══════════════════════════════════════════════════
+// DELIVERY LIST — multi-trip drag & drop + POD
+// ═══════════════════════════════════════════════════
+let _deliveryTrips = [];
+let _dragSrcIdx = null;
+let _pollTimer = null;
+
+let _pickupTrips = [];
+let _dragPickupSrcIdx = null;
+
+function renderPickupList() {
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  _pickupTrips = _allTrips.filter(function(t){ return t.status === 'Assigned' && t.leg === 1; })
+    .sort(function(a,b){ return (a.driver_sequence||0) - (b.driver_sequence||0); });
+  if (!_pickupTrips.length) {
+    content.innerHTML = '<div class="no-trip"><div class="icon">🚚</div><div style="font-weight:700;margin-bottom:.4rem">No Pick-Up Trips</div><div style="font-size:.8rem">Awaiting assignment from administrator.</div></div>';
+    loadRecentTrips();
+    return;
+  }
+  const list = document.createElement('div');
+  list.id = 'pickup-list-el';
+  list.style.cssText = 'width:100%;max-width:420px;display:flex;flex-direction:column;gap:.75rem';
+
+  _pickupTrips.forEach(function(trip, idx) {
+    const card = document.createElement('div');
+    card.className = 'delivery-item';
+    card.setAttribute('data-idx', idx);
+    card.draggable = true;
+    card.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;transition:border-color .15s';
+    card.innerHTML =
+      '<div style="display:flex;align-items:center;gap:.75rem">'
+      + '<span class="drag-handle" style="flex-shrink:0">⠿</span>'
+      + '<div style="flex:1">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">'
+      + '<span style="font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:20px;background:#6366f120;border:1px solid #6366f1;color:#6366f1">Assigned</span>'
+      + (trip.leg === 1 ? '<span style="font-size:.6rem;padding:.1rem .35rem;border-radius:4px;background:#6366f115;color:#6366f1;border:1px solid #6366f1">Leg 1</span>' : '')
+      + '</div>'
+      + '<div style="font-weight:800;font-family:monospace;color:var(--accent);margin-bottom:.3rem">' + (trip.do_no || '—') + '</div>'
+      + '<div style="font-size:.85rem;font-weight:600;margin-bottom:.2rem">'
+        + (trip.leg === 1 ? '<span style="font-size:.65rem;color:#6366f1;font-weight:600">🏭 PICKUP: </span>' : '')
+        + (trip.leg === 1 ? (trip._pickupName || trip.destination || '—') : (trip.destination || '—'))
+        + '</div>'
+      + '<div style="font-size:.75rem;color:var(--muted)">' + (trip.vehicle ? trip.vehicle.plate_no + ' · ' + trip.vehicle.vehicle_type : '—') + '</div>'
+      + '</div>'
+      + '</div>';
+    card.addEventListener('click', function(e) {
+      if (e.target.classList.contains('drag-handle')) return;
+      openTripDetail(trip.id);
+    });
+    list.appendChild(card);
+  });
+  content.appendChild(list);
+  initPickupDragDrop();
+}
+
+function initPickupDragDrop() {
+  const list = document.getElementById('pickup-list-el');
+  if (!list) return;
+  const items = list.querySelectorAll('.delivery-item[draggable="true"]');
+  items.forEach(function(item){
+    var srcIdx;
+    // Desktop
+    item.addEventListener('dragstart', function(e){
+      srcIdx = parseInt(item.getAttribute('data-idx'));
+      _dragPickupSrcIdx = srcIdx;
+      setTimeout(function(){ item.classList.add('dragging'); }, 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', function(){ item.classList.remove('dragging'); list.querySelectorAll('.delivery-item').forEach(function(i){ i.classList.remove('drag-over'); }); });
+    item.addEventListener('dragover', function(e){ e.preventDefault(); list.querySelectorAll('.delivery-item').forEach(function(i){ i.classList.remove('drag-over'); }); item.classList.add('drag-over'); });
+    item.addEventListener('drop', function(e){
+      e.preventDefault(); item.classList.remove('drag-over');
+      var toIdx = parseInt(item.getAttribute('data-idx'));
+      if (_dragPickupSrcIdx !== null && _dragPickupSrcIdx !== toIdx) reorderPickup(_dragPickupSrcIdx, toIdx);
+      _dragPickupSrcIdx = null;
+    });
+    // Mobile touch
+    var handle = item.querySelector('.drag-handle');
+    if (!handle) return;
+    var ghost = null, touchSrc = null, startY = 0;
+    handle.addEventListener('touchstart', function(e){
+      touchSrc = parseInt(item.getAttribute('data-idx'));
+      startY = e.touches[0].clientY;
+      ghost = item.cloneNode(true);
+      ghost.style.cssText = 'position:fixed;left:1rem;right:1rem;opacity:.85;pointer-events:none;z-index:999;border-color:var(--accent);background:var(--card);border-radius:14px;padding:1rem';
+      ghost.style.top = item.getBoundingClientRect().top + 'px';
+      document.body.appendChild(ghost);
+      item.classList.add('dragging');
+      e.preventDefault();
+    }, { passive: false });
+    handle.addEventListener('touchmove', function(e){
+      if (!ghost) return;
+      var dy = e.touches[0].clientY - startY;
+      ghost.style.top = (item.getBoundingClientRect().top + dy) + 'px';
+      var ty = e.touches[0].clientY;
+      list.querySelectorAll('.delivery-item').forEach(function(el){
+        var r = el.getBoundingClientRect();
+        el.classList.toggle('drag-over', ty >= r.top && ty <= r.bottom && el !== item);
+      });
+      e.preventDefault();
+    }, { passive: false });
+    handle.addEventListener('touchend', function(){
+      if (ghost) { ghost.remove(); ghost = null; }
+      item.classList.remove('dragging');
+      var over = list.querySelector('.delivery-item.drag-over');
+      if (over) {
+        over.classList.remove('drag-over');
+        var toIdx2 = parseInt(over.getAttribute('data-idx'));
+        if (touchSrc !== null && touchSrc !== toIdx2) reorderPickup(touchSrc, toIdx2);
+      }
+      touchSrc = null;
+    });
+  });
+}
+
+async function reorderPickup(fromIdx, toIdx) {
+  var moved = _pickupTrips.splice(fromIdx, 1)[0];
+  _pickupTrips.splice(toIdx, 0, moved);
+  _pickupTrips.forEach(function(t, i){
+    t.driver_sequence = i;
+    var at = _allTrips.find(function(x){ return x.id === t.id; });
+    if (at) at.driver_sequence = i;
+  });
+  await Promise.all(_pickupTrips.map(function(t, i){ return sb.from('fleet_trips').update({ driver_sequence: i }).eq('id', t.id); }));
+  renderPickupList();
+}
+
+function renderDeliveryList() {
+  const content = document.getElementById('trip-content');
+  content.innerHTML = '';
+  _deliveryTrips = _allTrips
+    .filter(function(t){ return t.status === 'Departed' || t.status === 'Arrived' || (t.status === 'Assigned' && t.leg !== 1); })
+    .sort(function(a,b){ return (a.driver_sequence||0) - (b.driver_sequence||0); });
+
+  if (!_deliveryTrips.length) {
+    content.innerHTML = '<div class="no-trip"><div class="icon">📦</div><div style="font-weight:700;margin-bottom:.4rem">No Active Deliveries</div><div style="font-size:.8rem">Please begin from the Pick Up tab.</div></div>';
     return;
   }
 
-  // ── SINGLE MODE ────────────────────────────────────
-  var btn = document.getElementById('confirm-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Memproses...'; }
+  const list = document.createElement('div');
+  list.className = 'delivery-list'; list.id = 'delivery-list-el';
+  _deliveryTrips.forEach(function(trip, idx){ list.appendChild(buildDeliveryItem(trip, idx)); });
+  content.appendChild(list);
+  initDragDrop();
+  pollDeliveryStatus();
+}
 
-  var ids  = _currentDelivery.ids || [];
-  var doNo = _currentDelivery.doNo || '—';
+// ── TRIP HISTORY ─────────────────────────────────
+var _historyTrips = [];
 
-  try {
-    // 1. Update stock_requests to Received
-    var reqIds = ids.slice();
-    // If no ids from home screen, look up by DO no
-    if (!reqIds.length && doNo && doNo !== '—') {
-      var { data: foundReqs } = await sb.from('stock_requests').select('id').eq('do_no', doNo);
-      reqIds = (foundReqs || []).map(function(r){ return r.id; });
+async function renderTripHistory() {
+  const content = document.getElementById('trip-content');
+  if (!_driver) return;
+
+  // Build the static shell (filter bar + list container) once
+  content.innerHTML =
+    '<div style="display:flex;gap:.4rem;margin-bottom:.6rem;flex-wrap:wrap;width:100%">'
+      + '<input type="date" id="hf-date" style="flex:1;min-width:120px;padding:.4rem .6rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyHistoryFilter()">'
+      + '<input type="text" id="hf-loc"  placeholder="🔍 Lokasi..." style="flex:2;min-width:120px;padding:.4rem .6rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyHistoryFilter()">'
+      + '<input type="text" id="hf-do"   placeholder="🔍 DO No..." style="flex:2;min-width:120px;padding:.4rem .6rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem" oninput="applyHistoryFilter()">'
+      + '<button onclick="document.getElementById(\'hf-date\').value=\'\';document.getElementById(\'hf-loc\').value=\'\';document.getElementById(\'hf-do\').value=\'\';applyHistoryFilter()" style="padding:.4rem .65rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.78rem;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div id="hist-list"><div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">⏳ Loading...</div></div>';
+
+  const { data: trips } = await sb.from('fleet_trips')
+    .select('id, do_no, destination, departure_time, arrival_time, pod_confirmed_at, status, leg')
+    .eq('driver_id', _driver.id)
+    .in('status', ['Delivered', 'Arrived', 'At Warehouse'])
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  // Deduplicate by do_no — keep highest-priority status per DO
+  var statusRank = { 'Delivered': 3, 'Arrived': 2, 'At Warehouse': 1 };
+  var doMap = {};
+  (trips || []).forEach(function(t) {
+    var key = t.do_no || t.id;
+    var existing = doMap[key];
+    if (!existing || (statusRank[t.status] || 0) > (statusRank[existing.status] || 0)) {
+      doMap[key] = t;
     }
-    if (reqIds.length) {
-      await sb.from('stock_requests').update({ status: 'Received' }).in('id', reqIds);
-      // Fetch batch_no per req so we can count cartons per REQ, not DO total
-      var { data: reqDetails } = await sb.from('stock_requests').select('id, batch_no, request_no').in('id', reqIds);
-      var scannedBarcodeSet = _scans.map(function(s){ return s.barcode; });
-      await Promise.all(reqIds.map(function(id){
-        var req = reqDetails && reqDetails.find(function(r){ return r.id === id; });
-        var batchNo = req ? (req.batch_no || req.request_no) : null;
-        var reqCount = _scans.length; // fallback: total
-        if (batchNo) {
-          var reqBarcodes = _allCartons.filter(function(c){ return c.batch_no === batchNo; }).map(function(c){ return c.barcode; });
-          reqCount = _scans.filter(function(s){ return reqBarcodes.includes(s.barcode); }).length;
-        }
-        var note = 'Karton diterima | ' + reqCount + ' karton diimbas | DO: ' + doNo + ' | Diterima oleh: ' + (receiverName || who);
-        return sb.from('request_status_log').insert({ request_id: id, status: 'Received', note: note, changed_by: who });
+  });
+  _historyTrips = Object.values(doMap);
+  applyHistoryFilter();
+}
+
+function applyHistoryFilter() {
+  var listEl = document.getElementById('hist-list');
+  if (!listEl) return;
+
+  var selDate = (document.getElementById('hf-date') || {}).value || '';
+  var selLoc  = ((document.getElementById('hf-loc')  || {}).value || '').toLowerCase().trim();
+  var selDo   = ((document.getElementById('hf-do')   || {}).value || '').toLowerCase().trim();
+
+  var filtered = _historyTrips.filter(function(t) {
+    if (selDate) {
+      var d = (t.departure_time || t.arrival_time || '').slice(0, 10);
+      if (d !== selDate) return false;
+    }
+    if (selLoc && !(t.destination || '').toLowerCase().includes(selLoc)) return false;
+    if (selDo  && !(t.do_no || '').toLowerCase().includes(selDo))  return false;
+    return true;
+  });
+
+  var isFiltered = selDate || selLoc || selDo;
+  var fmt = function(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-MY', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  };
+  var fmtShort = function(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-MY', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+  };
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="no-trip"><div class="icon">📋</div>'
+      + '<div style="font-weight:700;margin-bottom:.4rem">' + (isFiltered ? 'Tiada trip ditemui' : 'No Trip History') + '</div>'
+      + '<div style="font-size:.8rem;color:var(--muted)">' + (isFiltered ? 'Cuba tukar filter.' : 'Completed trips will appear here.') + '</div></div>';
+    return;
+  }
+
+  var html = '<div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:.1rem 0 .6rem">'
+    + filtered.length + ' Trip(s)' + (isFiltered ? ' (ditapis)' : '') + '</div>';
+
+  filtered.forEach(function(trip) {
+    var isDelivered = trip.status === 'Delivered';
+    var isWH        = trip.status === 'At Warehouse';
+    var badgeBg    = isDelivered ? '#10b98120' : isWH ? '#3b82f620' : '#f59e0b20';
+    var badgeColor = isDelivered ? 'var(--green)' : isWH ? '#3b82f6' : 'var(--yellow)';
+    var badgeText  = isDelivered ? '✅ Delivered' : isWH ? '🏭 At Warehouse' : '📍 Arrived';
+
+    html += '<div onclick="viewPOD(\'' + trip.id + '\',true)" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.6rem;cursor:pointer">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">'
+        + '<span style="font-weight:800;font-size:.88rem;color:var(--accent)">' + (trip.do_no || '—') + '</span>'
+        + '<span style="font-size:.68rem;padding:.15rem .5rem;border-radius:10px;font-weight:700;background:' + badgeBg + ';color:' + badgeColor + '">' + badgeText + '</span>'
+      + '</div>'
+      + '<div style="font-size:.8rem;font-weight:600;margin-bottom:.3rem">' + (trip.destination || '—') + '</div>'
+      + '<div style="display:flex;gap:1.5rem;font-size:.72rem;color:var(--muted)">'
+        + '<span>🚀 ' + fmtShort(trip.departure_time) + '</span>'
+        + '<span>📍 ' + fmtShort(trip.arrival_time) + '</span>'
+      + '</div>'
+      + (trip.pod_confirmed_at ? '<div style="font-size:.7rem;color:var(--green);margin-top:.3rem">✅ POD: ' + fmt(trip.pod_confirmed_at) + '</div>' : '')
+      + '</div>';
+  });
+
+  listEl.innerHTML = html;
+}
+
+function buildDeliveryItem(trip, idx) {
+  const departed = trip.departure_time ? new Date(trip.departure_time) : null;
+  const etaTime  = departed ? new Date(departed.getTime() + idx * 45 * 60000) : null;
+  const etaStr   = etaTime ? etaTime.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'}) : '—';
+  const isArrived = trip.status === 'Arrived';
+  const isPOD     = !!trip.pod_confirmed_at;
+
+  const item = document.createElement('div');
+  item.className = 'delivery-item';
+  item.setAttribute('data-trip-id', trip.id);
+  item.setAttribute('data-idx', idx);
+  item.draggable = !isArrived;
+
+  let statusText = '🚚 In Transit';
+  let actionHTML;
+  if (trip.leg === 1) {
+    // Leg 1 departed: drop at warehouse or direct delivery
+    actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
+      + '<button class="btn-arrived-sm" style="background:#3b82f6" onclick="markDropWarehouse(\'' + trip.id + '\',\'' + (trip.vehicle_id||'') + '\')">🏭 Drop at Warehouse</button>'
+      + '<button class="btn-arrived-sm" style="background:#10b981" onclick="markDirectDelivery(\'' + trip.id + '\')">🏪 Direct Delivery</button>'
+      + '</div>';
+  } else if (trip.status === 'Assigned') {
+    // Leg 2 assigned: must scan cartons at warehouse first, then depart
+    statusText = '📋 Assigned — Scan cartons to depart';
+    actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
+      + '<button class="btn-arrived-sm" style="background:#6366f1" onclick="openScanForTrip(\'' + trip.id + '\')">📦 Scan Cartons</button>'
+      + '<button class="btn-arrived-sm" style="background:#f59e0b;color:#000" onclick="departTrip(\'' + trip.id + '\')">🚀 Depart (Skip Scan)</button>'
+      + '</div>';
+  } else {
+    // Leg 2 departed: mark arrived
+    actionHTML = '<button class="btn-arrived-sm" onclick="markArrived(\'' + trip.id + '\')">📍 Mark as Arrived</button>';
+  }
+  if (isPOD) {
+    statusText = '✅ POD Confirmed';
+    actionHTML = '<button class="btn-pod" onclick="viewPOD(\'' + trip.id + '\')">📄 View POD</button>';
+  } else if (isArrived) {
+    statusText = '📍 Arrived — Awaiting staff carton scan';
+    actionHTML = '<span class="btn-waiting">⏳ Awaiting boutique confirmation...</span>';
+  }
+
+  item.innerHTML =
+    '<div class="delivery-item-header">'
+    + (isArrived ? '<span style="font-size:1.1rem;color:var(--border)">⠿</span>' : '<span class="drag-handle">⠿</span>')
+    + '<span class="seq-num">' + (idx + 1) + '</span>'
+    + '<span class="delivery-do">' + (trip.do_no || '—') + '</span>'
+    + (!isArrived ? '<span class="delivery-eta">ETA ' + etaStr + '</span>' : '')
+    + '</div>'
+    + '<div class="delivery-dest">'
+      + (trip.leg === 1 ? '<span style="font-size:.65rem;color:#10b981;font-weight:600">📦 DELIVER TO: </span>' : '')
+      + (trip.leg === 1 ? (trip._destBoutique || trip.destination || '—') : (trip.destination || '—'))
+      + '</div>'
+    + '<div class="delivery-status">' + statusText + '</div>'
+    + '<div class="delivery-actions">' + actionHTML + '</div>';
+
+  // Click card body (not the button) to open detail view — allow for Arrived (awaiting POD) too
+  if (!isPOD) {
+    item.style.cursor = 'pointer';
+    item.addEventListener('click', function(e) {
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+      openTripDetail(trip.id);
+    });
+  }
+
+  return item;
+}
+
+function initDragDrop() {
+  const list = document.getElementById('delivery-list-el');
+  if (!list) return;
+  const items = list.querySelectorAll('.delivery-item[draggable="true"]');
+
+  items.forEach(function(item){
+    var srcIdx;
+    // Desktop
+    item.addEventListener('dragstart', function(e){
+      srcIdx = parseInt(item.getAttribute('data-idx'));
+      _dragSrcIdx = srcIdx;
+      setTimeout(function(){ item.classList.add('dragging'); }, 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', function(){ item.classList.remove('dragging'); list.querySelectorAll('.delivery-item').forEach(function(i){ i.classList.remove('drag-over'); }); });
+    item.addEventListener('dragover', function(e){ e.preventDefault(); list.querySelectorAll('.delivery-item').forEach(function(i){ i.classList.remove('drag-over'); }); item.classList.add('drag-over'); });
+    item.addEventListener('drop', function(e){
+      e.preventDefault(); item.classList.remove('drag-over');
+      var toIdx = parseInt(item.getAttribute('data-idx'));
+      if (_dragSrcIdx !== null && _dragSrcIdx !== toIdx) reorderDelivery(_dragSrcIdx, toIdx);
+      _dragSrcIdx = null;
+    });
+
+    // Mobile touch
+    var handle = item.querySelector('.drag-handle');
+    if (!handle) return;
+    var ghost = null, touchSrc = null, startY = 0;
+    handle.addEventListener('touchstart', function(e){
+      touchSrc = parseInt(item.getAttribute('data-idx'));
+      startY = e.touches[0].clientY;
+      ghost = item.cloneNode(true);
+      ghost.style.cssText = 'position:fixed;left:1rem;right:1rem;opacity:.85;pointer-events:none;z-index:999;border-color:var(--accent);background:var(--card);border-radius:14px;padding:1rem';
+      ghost.style.top = item.getBoundingClientRect().top + 'px';
+      document.body.appendChild(ghost);
+      item.classList.add('dragging');
+      e.preventDefault();
+    }, { passive: false });
+    handle.addEventListener('touchmove', function(e){
+      if (!ghost) return;
+      var dy = e.touches[0].clientY - startY;
+      ghost.style.top = (item.getBoundingClientRect().top + dy) + 'px';
+      var ty = e.touches[0].clientY;
+      list.querySelectorAll('.delivery-item').forEach(function(el){
+        var r = el.getBoundingClientRect();
+        el.classList.toggle('drag-over', ty >= r.top && ty <= r.bottom && el !== item);
+      });
+      e.preventDefault();
+    }, { passive: false });
+    handle.addEventListener('touchend', function(){
+      if (ghost) { ghost.remove(); ghost = null; }
+      item.classList.remove('dragging');
+      var over = list.querySelector('.delivery-item.drag-over');
+      if (over) {
+        over.classList.remove('drag-over');
+        var toIdx2 = parseInt(over.getAttribute('data-idx'));
+        if (touchSrc !== null && touchSrc !== toIdx2) reorderDelivery(touchSrc, toIdx2);
+      }
+      touchSrc = null;
+    });
+  });
+}
+
+async function reorderDelivery(fromIdx, toIdx) {
+  var moved = _deliveryTrips.splice(fromIdx, 1)[0];
+  _deliveryTrips.splice(toIdx, 0, moved);
+  // Update driver_sequence in _allTrips memory so renderDeliveryList sorts correctly
+  _deliveryTrips.forEach(function(t, i){
+    t.driver_sequence = i;
+    var at = _allTrips.find(function(x){ return x.id === t.id; });
+    if (at) at.driver_sequence = i;
+  });
+  await Promise.all(_deliveryTrips.map(function(t, i){ return sb.from('fleet_trips').update({ driver_sequence: i }).eq('id', t.id); }));
+  renderDeliveryList();
+}
+
+async function openTripDetail(tripId) {
+  const found = _allTrips.find(function(t){ return t.id === tripId; });
+  if (!found) return;
+  _trip = found;
+  // Fetch destination coords
+  _destCoords = null;
+  if (_trip.destination) {
+    const { data: bout } = await sb.from('boutiques').select('latitude,longitude').eq('name', _trip.destination).maybeSingle();
+    if (bout && bout.latitude && bout.longitude) _destCoords = { lat: bout.latitude, lng: bout.longitude };
+  }
+  renderTrip(true); // true = show back button
+}
+
+async function markDropWarehouse(tripId, vehicleId) {
+  if (!confirm('Please confirm drop-off at the warehouse.')) return;
+  await sb.from('fleet_trips').update({ status: 'At Warehouse', arrival_time: new Date().toISOString() }).eq('id', tripId);
+  var trip = _allTrips.find(function(x){ return x.id === tripId; });
+  // Update stock_requests to 'In Transit At Warehouse' and log
+  if (trip && trip.do_no) {
+    var { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', trip.do_no);
+    if (reqs && reqs.length) {
+      var reqIds = reqs.map(function(r){ return r.id; });
+      await sb.from('stock_requests').update({ status: 'In Transit At Warehouse' }).in('id', reqIds);
+      var logNote = 'Dropped at warehouse | Driver: ' + _driver.name + ' | DO: ' + trip.do_no;
+      await Promise.all(reqIds.map(function(id) {
+        return sb.from('request_status_log').insert({ request_id: id, status: 'In Transit At Warehouse', note: logNote, changed_by: _driver.name });
       }));
     }
+  }
+  if (vehicleId) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', vehicleId);
+  await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+  if (trip) trip.status = 'At Warehouse';
+  _allTrips = _allTrips.filter(function(x){ return x.id !== tripId; });
+  renderDeliveryList();
+}
 
-    // 2. Update cartons status to 'delivered'
-    var scannedBarcodes = _scans.map(function(s){ return s.barcode; });
-    if (scannedBarcodes.length) {
-      await sb.from('cartons').update({ status: 'delivered' }).in('barcode', scannedBarcodes);
+async function markArrived(tripId) {
+  if (!confirm(t('confirmArrive'))) return;
+  var t = _allTrips.find(function(x){ return x.id === tripId; });
+  await sb.from('fleet_trips').update({ status:'Arrived', arrival_time: new Date().toISOString() }).eq('id', tripId);
+  if (t && t.do_no) {
+    var { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', t.do_no);
+    if (reqs && reqs.length) {
+      var logNote = 'Driver arrived | Driver: ' + (_driver ? _driver.name : '') + ' | DO: ' + t.do_no;
+      await Promise.all(reqs.map(function(r){ return sb.from('request_status_log').insert({ request_id: r.id, status: 'Arrived', note: logNote, changed_by: _driver ? _driver.name : '' }); }));
     }
+  }
+  if (t) t.status = 'Arrived';
+  renderDeliveryList();
+}
 
-    // 3. Update fleet_trip: set POD confirmed + receiver name + signature
-    var podUpdate = {
-      status: 'Arrived',
-      pod_confirmed_at: new Date().toISOString(),
-      pod_confirmed_by: who,
-      receiver_name: receiverName || null,
-      signature_image: signatureImage || null
-    };
-    if (_currentDelivery.tripId) {
-      // Direct match by trip ID (most reliable)
-      await sb.from('fleet_trips').update(podUpdate).eq('id', _currentDelivery.tripId);
-    } else if (_currentDelivery.doNo) {
-      // Fallback: match by DO no
-      await sb.from('fleet_trips').update(podUpdate).eq('do_no', _currentDelivery.doNo);
+async function markDirectDelivery(tripId) {
+  if (!confirm('Confirm arrival at this destination?\n\nBoutique staff will need to scan cartons to complete delivery.')) return;
+  var tr = _allTrips.find(function(x){ return x.id === tripId; });
+  await sb.from('fleet_trips').update({ status:'Arrived', arrival_time: new Date().toISOString() }).eq('id', tripId);
+  if (tr && tr.do_no) {
+    var { data: reqs } = await sb.from('stock_requests').select('id').eq('do_no', tr.do_no);
+    if (reqs && reqs.length) {
+      var logNote = 'Out for delivery | Driver: ' + (_driver ? _driver.name : '') + ' | DO: ' + tr.do_no;
+      await Promise.all(reqs.map(function(r){ return sb.from('request_status_log').insert({ request_id: r.id, status: 'Out for Delivery', note: logNote, changed_by: _driver ? _driver.name : '' }); }));
     }
+  }
+  if (tr) tr.status = 'Arrived';
+  renderDeliveryList();
+}
 
-    showToast('✅ Penerimaan berjaya disahkan!', 3000);
-    setTimeout(function(){
-      stopScanner();
-      showScreen('screen-home');
-      loadDeliveries();
-    }, 1500);
+function pollDeliveryStatus() {
+  clearTimeout(_pollTimer);
+  var pending = _deliveryTrips.filter(function(t){ return t.status === 'Arrived' && !t.pod_confirmed_at; });
+  if (!pending.length) return;
+  _pollTimer = setTimeout(async function(){
+    var ids = pending.map(function(t){ return t.id; });
+    var { data } = await sb.from('fleet_trips').select('id, status, pod_confirmed_at, pod_confirmed_by, arrival_time').in('id', ids);
+    if (data) {
+      data.forEach(function(fresh){
+        var ex = _allTrips.find(function(t){ return t.id === fresh.id; });
+        if (ex) Object.assign(ex, fresh);
+      });
+      var confirmed = data.filter(function(t){ return !!t.pod_confirmed_at; });
+      if (confirmed.length) renderDeliveryList();
+      else pollDeliveryStatus();
+    }
+  }, 5000);
+}
 
+async function viewPOD(tripId, readOnly) {
+  // Always fetch fresh — signature is saved by receive-app after local _allTrips is stale
+  var { data: fresh } = await sb.from('fleet_trips')
+    .select('id, do_no, destination, arrival_time, pod_confirmed_at, pod_confirmed_by, vehicle_id, receiver_name, signature_image, pod_photo')
+    .eq('id', tripId).single();
+  var trip = fresh || _allTrips.find(function(t){ return t.id === tripId; });
+  if (!trip) return;
+  var [reqRes, cartonByDo] = await Promise.all([
+    sb.from('stock_requests').select('id, do_no, batch_no, request_no, from_b:from_boutique_id(name), to_b:to_boutique_id(name)').eq('do_no', trip.do_no),
+    sb.from('cartons').select('barcode, carton_no, total_cartons').eq('do_no', trip.do_no)
+  ]);
+  var req = reqRes.data && reqRes.data[0] ? reqRes.data[0] : null;
+  var cartons = cartonByDo.data || [];
+  // Fallback: fetch by batch_no if no cartons found via do_no
+  if (!cartons.length && reqRes.data && reqRes.data.length) {
+    var bkeys = reqRes.data.map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
+    if (bkeys.length) {
+      var { data: byBatch } = await sb.from('cartons').select('barcode, carton_no, total_cartons').in('batch_no', bkeys);
+      cartons = byBatch || [];
+    }
+  }
+  var fmt = function(d){ return d ? new Date(d).toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'; };
+
+  document.getElementById('pod-details').innerHTML = [
+    ['DO No.', trip.do_no || '—'],
+    ['From', req && req.to_b ? req.to_b.name : '—'],
+    ['To', trip.destination || '—'],
+    ['Driver', _driver ? _driver.name : '—'],
+    ['Arrived', fmt(trip.arrival_time)],
+    ['Confirmed By', trip.pod_confirmed_by || '—'],
+    ['POD Timestamp', fmt(trip.pod_confirmed_at)],
+    ['Total Cartons', cartons.length || '—']
+  ].map(function(r){ return '<div class="pod-row"><span class="pod-label">' + r[0] + '</span><span class="pod-value">' + r[1] + '</span></div>'; }).join('');
+
+  if (cartons.length) {
+    document.getElementById('pod-cartons').style.display = 'block';
+    // Group by STO (barcode parts[1]), number per-group
+    var stoGroups = {}, stoOrder = [];
+    cartons.forEach(function(c) {
+      var parts = c.barcode ? c.barcode.split('|') : [];
+      var sto = parts.length >= 2 ? parts[1] : 'Unknown';
+      if (!stoGroups[sto]) { stoGroups[sto] = []; stoOrder.push(sto); }
+      stoGroups[sto].push(c);
+    });
+    var html = '';
+    stoOrder.forEach(function(sto) {
+      var grp = stoGroups[sto];
+      html += '<div style="font-size:.68rem;font-weight:800;color:var(--muted);padding:.3rem 0 .15rem;letter-spacing:.05em">' + sto + ' (' + grp.length + ')</div>';
+      grp.forEach(function(c, idx) {
+        var parts = c.barcode ? c.barcode.split('|') : [];
+        if (parts.length >= 3) parts[2] = (idx+1) + '/' + grp.length;
+        var displayBarcode = parts.length ? parts.join('|') : (c.barcode || '—');
+        html += '<div class="pod-carton-item">✅ ' + displayBarcode + '</div>';
+      });
+    });
+    document.getElementById('pod-carton-list').innerHTML = html;
+  }
+  // Show receiver name + signature if available
+  var sigCard = document.getElementById('pod-signature-card');
+  if (trip.signature_image) {
+    sigCard.style.display = 'block';
+    document.getElementById('pod-receiver-name').textContent = trip.receiver_name ? '👤 ' + trip.receiver_name : '';
+    document.getElementById('pod-signature-img').src = trip.signature_image;
+  } else {
+    sigCard.style.display = 'none';
+  }
+  document.getElementById('pod-sub').textContent = (trip.do_no || '') + ' — ' + (trip.destination || '');
+  // Store tripId for confirmDelivered(); hide action button in read-only (History) mode
+  // Show POD photo
+  var photoCard = document.getElementById('pod-photo-card');
+  var photoPreview = document.getElementById('pod-photo-preview');
+  var photoImg = document.getElementById('pod-photo-img');
+  var photoBtn = document.getElementById('pod-photo-btn');
+  if (readOnly) {
+    if (trip.pod_photo) {
+      photoCard.style.display = 'block';
+      photoPreview.style.display = 'block';
+      photoImg.src = trip.pod_photo;
+      photoBtn.style.display = 'none';
+    } else {
+      photoCard.style.display = 'none';
+    }
+  } else {
+    photoCard.style.display = 'block';
+    photoBtn.style.display = '';
+    if (trip.pod_photo) {
+      photoPreview.style.display = 'block';
+      photoImg.src = trip.pod_photo;
+    }
+  }
+
+  document.getElementById('screen-pod').setAttribute('data-trip-id', tripId);
+  document.getElementById('btn-delivered').style.display = readOnly ? 'none' : '';
+  showScreen('screen-pod');
+}
+
+// ── POD PHOTO CAPTURE ────────────────────────────
+var _podPhotoDataUrl = null;
+
+function onPodPhotoChosen(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _podPhotoDataUrl = e.target.result;
+    var img = document.getElementById('pod-photo-img');
+    img.src = _podPhotoDataUrl;
+    document.getElementById('pod-photo-preview').style.display = 'block';
+    document.getElementById('pod-photo-btn').textContent = '📷 Tukar Gambar';
+  };
+  reader.readAsDataURL(file);
+  // Reset input so same file can be chosen again
+  input.value = '';
+}
+
+function clearPodPhoto() {
+  _podPhotoDataUrl = null;
+  document.getElementById('pod-photo-img').src = '';
+  document.getElementById('pod-photo-preview').style.display = 'none';
+  document.getElementById('pod-photo-btn').textContent = '📷 Ambil Gambar';
+}
+
+function closePOD() { clearPodPhoto(); showScreen('screen-home'); if (_currentTab === 'delivery') renderDeliveryList(); }
+
+async function confirmDelivered() {
+  var tripId = document.getElementById('screen-pod').getAttribute('data-trip-id');
+  if (!tripId) { alert('Tiada trip ID.'); return; }
+  var btn = document.getElementById('btn-delivered');
+  btn.disabled = true; btn.textContent = '⏳ Menyimpan...';
+
+  try {
+    var update = { status: 'Delivered', pod_confirmed_at: new Date().toISOString() };
+    // Save photo if taken — try pod_photo column (add via Supabase if not yet: ALTER TABLE fleet_trips ADD COLUMN pod_photo text;)
+    if (_podPhotoDataUrl) update.pod_photo = _podPhotoDataUrl;
+    var { error } = await sb.from('fleet_trips').update(update).eq('id', tripId);
+    if (error) throw error;
+    // Mark stock_requests as Received
+    var { data: trip } = await sb.from('fleet_trips').select('do_no').eq('id', tripId).single();
+    if (trip && trip.do_no) {
+      await sb.from('stock_requests').update({ status: 'Received' }).eq('do_no', trip.do_no);
+      await sb.from('cartons').update({ status: 'delivered' }).eq('do_no', trip.do_no);
+    }
+    clearPodPhoto();
+    showScreen('screen-home');
+    loadTrip();
   } catch(err) {
-    console.error(err);
-    showToast('❌ Ralat! Cuba lagi.', 3000);
-    btn.disabled = false;
-    btn.textContent = '✅ Sahkan Penerimaan';
-    btn.classList.add('ready');
+    console.error('confirmDelivered error:', err);
+    alert('Ralat: ' + (err.message || err));
+    btn.disabled = false; btn.textContent = '✅ Delivered';
   }
 }
+
+async function sharePOD() {
+  var btn = document.querySelector('#screen-pod .action-btn[onclick="sharePOD()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyediakan...'; }
+
+  try {
+    // Build a self-contained capture area
+    var captureEl = document.getElementById('pod-capture-area');
+    captureEl.innerHTML =
+      '<div style="background:#0f172a;padding:1.5rem;font-family:-apple-system,sans-serif;border-radius:12px;color:#f1f5f9">'
+      + '<div style="text-align:center;margin-bottom:1rem">'
+        + '<div style="font-size:2.5rem">✅</div>'
+        + '<div style="font-size:1.1rem;font-weight:800;color:#10b981">Delivery Confirmed</div>'
+        + '<div style="font-size:.75rem;color:#94a3b8;margin-top:.2rem">' + (document.getElementById('pod-sub').textContent || '') + '</div>'
+      + '</div>'
+      + document.getElementById('pod-details').outerHTML
+      + (document.getElementById('pod-signature-card').style.display !== 'none'
+          ? document.getElementById('pod-signature-card').outerHTML : '')
+      + (_podPhotoDataUrl
+          ? '<div style="margin-top:1rem"><div style="font-size:.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">📷 Gambar Bukti</div>'
+            + '<img src="' + _podPhotoDataUrl + '" style="width:100%;border-radius:8px;display:block;object-fit:cover;max-height:260px"/></div>'
+          : '')
+      + '<div style="text-align:center;font-size:.65rem;color:#475569;margin-top:1rem;border-top:1px solid #1e293b;padding-top:.75rem">Generated by KHATAM Fleet System · ' + new Date().toLocaleString('en-MY') + '</div>'
+      + '</div>';
+
+    var canvas = await html2canvas(captureEl, {
+      backgroundColor: '#0f172a',
+      scale: 2,
+      useCORS: true,
+      logging: false
+    });
+    captureEl.innerHTML = '';  // clean up
+
+    canvas.toBlob(async function(blob) {
+      var doNo = (document.getElementById('pod-sub').textContent || 'POD').split('—')[0].trim().replace(/[^a-z0-9-]/gi,'_');
+      var filename = 'POD_' + doNo + '_' + Date.now() + '.png';
+
+      // Try Web Share API (mobile)
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
+        await navigator.share({
+          title: 'Proof of Delivery — ' + doNo,
+          files: [new File([blob], filename, { type: 'image/png' })]
+        });
+      } else {
+        // Fallback: download
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+      }
+      if (btn) { btn.disabled = false; btn.textContent = '📤 Share / Simpan POD'; }
+    }, 'image/png');
+
+  } catch(err) {
+    console.error('sharePOD error:', err);
+    alert('Gagal menyediakan gambar POD.');
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Share / Simpan POD'; }
+  }
+}
+
+// ── GPS ──────────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) return;
+  stopGPS();
+  sendLocation();
+  _gpsInterval = setInterval(sendLocation, 30000);
+}
+function stopGPS() {
+  if (_gpsInterval) { clearInterval(_gpsInterval); _gpsInterval = null; }
+  const el = document.getElementById('gps-status');
+  if (el) { el.textContent = t('gpsOff'); el.className = 'gps-off'; }
+}
+async function sendLocation() {
+  if (!_trip) return;
+  navigator.geolocation.getCurrentPosition(async function(pos){
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    const el = document.getElementById('gps-status');
+    const { error } = await sb.from('fleet_trips')
+      .update({ lat, lng, last_location_update: new Date().toISOString() })
+      .eq('id', _trip.id);
+    if (error) {
+      console.error('GPS update failed:', error.message, 'trip id:', _trip.id);
+      if (el) { el.textContent = '⚠️ GPS Error: ' + error.message; el.className = 'gps-off'; }
+    } else {
+      if (el) { el.textContent = '📡 GPS Active · ' + lat.toFixed(5) + ',' + lng.toFixed(5); el.className = 'gps-on'; }
+      updateDriverMapPin(lat, lng);
+    }
+  }, function(err){
+    const el = document.getElementById('gps-status');
+    if (el) { el.textContent = '⚠️ GPS: ' + err.message; el.className = 'gps-off'; }
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// ── MAP ──────────────────────────────────────────
+function initDriverMap() {
+  if (!_driverMap) {
+    _driverMap = L.map('trip-map', { zoomControl:false, attributionControl:false }).setView([3.1390,101.6869],13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_driverMap);
+  }
+  setTimeout(function(){ if (_driverMap) _driverMap.invalidateSize(); }, 150);
+}
+async function updateDriverMapPin(lat, lng) {
+  if (!_driverMap) return;
+
+  // Driver pin (blue pulsing)
+  const driverIcon = L.divIcon({ className:'', html:'<div style="width:16px;height:16px;background:#6366f1;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.5);animation:pulse 2s infinite"></div>', iconSize:[16,16], iconAnchor:[8,8] });
+  if (_driverMarker) { _driverMarker.setLatLng([lat,lng]); }
+  else { _driverMarker = L.marker([lat,lng],{icon:driverIcon}).addTo(_driverMap); }
+
+  // Destination pin (green flag)
+  if (_destCoords) {
+    const destIcon = L.divIcon({ className:'', html:'<div style="width:14px;height:14px;background:#10b981;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.4)"></div>', iconSize:[14,14], iconAnchor:[7,7] });
+    if (_destMarker) { _destMarker.setLatLng([_destCoords.lat, _destCoords.lng]); }
+    else { _destMarker = L.marker([_destCoords.lat, _destCoords.lng], {icon:destIcon}).addTo(_driverMap).bindPopup('<b>🏁 ' + (_trip ? _trip.destination : 'Destination') + '</b>'); }
+
+    // Draw/update road route
+    const coords = await fetchOSRMRoute(lat, lng, _destCoords.lat, _destCoords.lng);
+    if (coords) {
+      if (_routeLine) { _driverMap.removeLayer(_routeLine); }
+      _routeLine = L.polyline(coords, { color:'#6366f1', weight:5, opacity:0.8, dashArray:'10,6' }).addTo(_driverMap);
+    }
+
+    // Fit map to show both driver + destination
+    _driverMap.fitBounds(L.latLngBounds([[lat,lng],[_destCoords.lat,_destCoords.lng]]).pad(0.25));
+  } else {
+    _driverMap.setView([lat,lng],15);
+  }
+}
+
+// ── RECENT TRIPS ─────────────────────────────────
+async function loadRecentTrips() {
+  const content = document.getElementById('trip-content');
+  const { data } = await sb.from('fleet_trips')
+    .select('do_no,destination,status,arrival_time')
+    .eq('driver_id',_driver.id).in('status',['Arrived','Cancelled'])
+    .order('created_at',{ascending:false}).limit(5);
+  if (!data || !data.length) return;
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:.8rem;font-weight:700;color:var(--muted);margin:.75rem 0 .5rem;width:100%;max-width:420px';
+  title.textContent = t('recentTrips');
+  content.appendChild(title);
+  data.forEach(function(trip){
+    const card = document.createElement('div'); card.className = 'history-card';
+    const time = trip.arrival_time ? new Date(trip.arrival_time).toLocaleString('en-MY',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+    card.innerHTML = '<div class="history-do">' + (trip.do_no||'—') + '</div><div class="history-dest">' + (trip.destination||'—') + '</div><div class="history-time">' + time + '</div>';
+    content.appendChild(card);
+  });
+}
+
+// ── INIT ─────────────────────────────────────────
+function hideSplash() {
+  const s = document.getElementById('splash');
+  if (s) s.style.display = 'none';
+}
+
+window.addEventListener('DOMContentLoaded', function(){
+  setLang(_lang);
+  const saved = localStorage.getItem('driver_session');
+  if (saved) {
+    try {
+      const s = JSON.parse(saved);
+      sb.from('fleet_drivers').select('*').eq('id', s.id).single().then(function(res){
+        if (res.data) {
+          _driver = res.data;
+          showHome();
+        } else {
+          localStorage.removeItem('driver_session');
+          showScreen('screen-login');
+        }
+        hideSplash();
+      }).catch(function(){
+        showScreen('screen-login');
+        hideSplash();
+      });
+    } catch(e){
+      showScreen('screen-login');
+      hideSplash();
+    }
+  } else {
+    showScreen('screen-login');
+    hideSplash();
+  }
+  document.getElementById('inp-pass').addEventListener('keydown', function(e){ if (e.key==='Enter') doLogin(); });
+});
 
 // ── PWA: Service Worker + Install Prompt ─────────
 if ('serviceWorker' in navigator) {
@@ -1292,7 +2086,7 @@ function installPWA() {
 }
 </script>
 <div id="pwa-install-btn" style="display:none;position:fixed;bottom:1.5rem;right:1rem;z-index:9999">
-  <button onclick="installPWA()" style="padding:.6rem 1.1rem;background:#10b981;color:#fff;border:none;border-radius:20px;font-size:.82rem;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,.4)">📲 Install App</button>
+  <button onclick="installPWA()" style="padding:.6rem 1.1rem;background:#6366f1;color:#fff;border:none;border-radius:20px;font-size:.82rem;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(99,102,241,.4)">📲 Install App</button>
 </div>
 </body>
 </html>
