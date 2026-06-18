@@ -460,6 +460,19 @@ async function loadTrip() {
     .eq('driver_id', _driver.id)
     .in('status', ['Assigned','Departed','Arrived'])
     .order('created_at', { ascending: false });
+  // Auto-promote Arrived+pod_confirmed_at trips → Delivered in background
+  const toPromote = (trips || []).filter(function(t){ return t.status === 'Arrived' && t.pod_confirmed_at; });
+  if (toPromote.length) {
+    Promise.all(toPromote.map(function(t){ return sb.from('fleet_trips').update({ status: 'Delivered' }).eq('id', t.id); }));
+    toPromote.forEach(function(t){ t.status = 'Delivered'; });
+  }
+  // Check for recently POD-confirmed trips the driver hasn't viewed yet
+  const recentPod = toPromote.find(function(t){
+    return (Date.now() - new Date(t.pod_confirmed_at).getTime()) < 2 * 60 * 60 * 1000;
+  });
+  if (recentPod) {
+    setTimeout(function(){ viewPOD(recentPod.id, true); }, 300);
+  }
   // Exclude Arrived trips that already have POD confirmed (fully done)
   _allTrips = (trips || []).filter(function(t){ return !(t.status === 'Arrived' && t.pod_confirmed_at); });
 
@@ -643,6 +656,20 @@ function renderTrip(showBack) {
         if (tripRef.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', tripRef.vehicle_id);
         await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
         Object.assign(tripRef, data);
+        // Promote other Arrived trips to same destination that also have pod_confirmed_at set
+        const sameDest = (_allTrips || []).filter(function(x){
+          return x.id !== tripId && x.status === 'Arrived' && x.destination === tripRef.destination;
+        });
+        if (sameDest.length) {
+          const sameDestIds = sameDest.map(function(x){ return x.id; });
+          const { data: podCheck } = await sb.from('fleet_trips').select('id, pod_confirmed_at').in('id', sameDestIds);
+          const confirmedIds = (podCheck || []).filter(function(r){ return r.pod_confirmed_at; }).map(function(r){ return r.id; });
+          if (confirmedIds.length) {
+            await sb.from('fleet_trips').update({ status: 'Delivered' }).in('id', confirmedIds);
+            confirmedIds.forEach(function(cid){ var t = _allTrips.find(function(x){ return x.id === cid; }); if (t) t.status = 'Delivered'; });
+            _allTrips = _allTrips.filter(function(x){ return confirmedIds.indexOf(x.id) === -1; });
+          }
+        }
         _allTrips = _allTrips.filter(function(x){ return x.id !== tripId; });
         viewPOD(tripId);
       }
@@ -1132,9 +1159,12 @@ async function doDropWarehouse() {
   if (!_trip) return;
   if (!confirm('Please confirm drop-off at the warehouse.')) return;
   stopGPS();
+  const _now = new Date().toISOString();
   const { error } = await sb.from('fleet_trips').update({
     status: 'At Warehouse',
-    arrival_time: new Date().toISOString()
+    arrival_time: _now,
+    pod_confirmed_at: _now,
+    pod_confirmed_by: _driver ? _driver.name : 'Driver'
   }).eq('id', _trip.id);
   if (error) { alert('Error: ' + error.message); return; }
   // Update stock_requests to 'In Transit At Warehouse' and log
