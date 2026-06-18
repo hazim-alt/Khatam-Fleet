@@ -1068,7 +1068,7 @@ function updateBatchBtn() {
   if (chkAll) chkAll.checked = checked === all && all > 0;
 }
 
-async function startBatchReceive() {
+function startBatchReceive() {
   var selected = [];
   document.querySelectorAll('.order-chk:checked').forEach(function(chk){
     var card = chk.closest('.delivery-card');
@@ -1077,39 +1077,23 @@ async function startBatchReceive() {
       if (k && _cardPayloads[k]) selected.push(_cardPayloads[k]);
     }
   });
-  if (!selected.length) return;
+  if (!selected.length) { showToast('Pilih order dahulu', 2000); return; }
 
   _batchDeliveries = selected;
   _currentDelivery = selected[0];
   _scans = [];
+  _allCartons = []; // no pre-fetch — scan or skip
 
-  // Fetch cartons from all selected DOs combined
-  var allDoNos = selected.filter(function(s){ return s.doNo; }).map(function(s){ return s.doNo; });
-  var allBatchNos = selected.filter(function(s){ return s.batchNo && !s.doNo; }).map(function(s){ return s.batchNo; });
-  _allCartons = [];
-  try {
-    if (allDoNos.length) {
-      var resDC = await sb.from('cartons').select('id,barcode,carton_no,total_cartons,do_no,batch_no').in('do_no', allDoNos);
-      _allCartons = _allCartons.concat(resDC.data || []);
-    }
-    if (allBatchNos.length) {
-      var resBC = await sb.from('cartons').select('id,barcode,carton_no,total_cartons,do_no,batch_no').in('batch_no', allBatchNos);
-      _allCartons = _allCartons.concat(resBC.data || []);
-    }
-  } catch(e) { console.error('batch carton fetch:', e); _allCartons = []; }
-
-  // Show scan screen
   var label = selected.length + ' Order (' + selected.map(function(s){ return s.doNo || s.batchNo; }).join(', ') + ')';
   document.getElementById('scan-do-label').textContent = label;
   document.getElementById('scan-count').textContent = '0';
-  document.getElementById('scan-total').textContent = _allCartons.length || '?';
+  document.getElementById('scan-total').textContent = '?';
   document.getElementById('scan-status-msg').textContent = '';
   document.getElementById('confirm-btn').classList.remove('ready');
   document.getElementById('manual-input').value = '';
   showScreen('screen-scan');
   renderReceiveScanList();
   startScanner();
-  setTimeout(function(){ document.getElementById('manual-input').focus(); }, 800);
 }
 
 var _batchDeliveries = [];
