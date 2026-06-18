@@ -783,6 +783,7 @@ function renderReceiveScanList() {
 
 function closeScan() {
   stopScanner();
+  _batchDeliveries = [];
   showScreen('screen-home');
   loadDeliveries();
 }
@@ -1087,13 +1088,33 @@ function startBatchReceive() {
   var label = selected.length + ' Order (' + selected.map(function(s){ return s.doNo || s.batchNo; }).join(', ') + ')';
   document.getElementById('scan-do-label').textContent = label;
   document.getElementById('scan-count').textContent = '0';
-  document.getElementById('scan-total').textContent = '?';
+  document.getElementById('scan-total').textContent = '⏳';
   document.getElementById('scan-status-msg').textContent = '';
   document.getElementById('confirm-btn').classList.remove('ready');
   document.getElementById('manual-input').value = '';
+  // Hide batch button while on scan screen
+  var bar = document.getElementById('batch-receive-bar');
+  if (bar) bar.style.display = 'none';
   showScreen('screen-scan');
   renderReceiveScanList();
   startScanner();
+  // Fetch cartons in background after screen is shown
+  (async function() {
+    var allDoNos = selected.filter(function(s){ return s.doNo; }).map(function(s){ return s.doNo; });
+    var allBatchNos = selected.filter(function(s){ return s.batchNo && !s.doNo; }).map(function(s){ return s.batchNo; });
+    try {
+      if (allDoNos.length) {
+        var resDC = await sb.from('cartons').select('id,barcode,carton_no,total_cartons,do_no,batch_no').in('do_no', allDoNos);
+        _allCartons = _allCartons.concat(resDC.data || []);
+      }
+      if (allBatchNos.length) {
+        var resBC = await sb.from('cartons').select('id,barcode,carton_no,total_cartons,do_no,batch_no').in('batch_no', allBatchNos);
+        _allCartons = _allCartons.concat(resBC.data || []);
+      }
+    } catch(e) { console.error('batch carton fetch:', e); }
+    document.getElementById('scan-total').textContent = _allCartons.length || '?';
+    renderReceiveScanList();
+  })();
 }
 
 var _batchDeliveries = [];
