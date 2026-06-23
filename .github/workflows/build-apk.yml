@@ -267,7 +267,8 @@ jobs:
         with:
           name: khatam-receive-apk
           path: build-receive/app/build/outputs/apk/release/app-release.apk
-          build-rawmat:
+
+  build-rawmat:
     name: Build Raw Material APK
     runs-on: ubuntu-latest
     steps:
