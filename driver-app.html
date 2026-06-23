@@ -493,7 +493,31 @@ async function loadTrip() {
     _allTrips.forEach(function(t){
       if (t.leg === 1 && t.do_no && doFulfillerMap[t.do_no]) t._pickupName = doFulfillerMap[t.do_no];
       if (t.leg === 1 && t.do_no && doDestMap[t.do_no]) t._destBoutique = doDestMap[t.do_no];
+      if (t.leg === 1 && t.do_no && !doFulfillerMap[t.do_no]) t._isFabricDO = true;
     });
+  }
+
+  // For fabric DO trips (Departed), load scan count + expected total from DB
+  var fabricDOTrips = _allTrips.filter(function(t){ return t._isFabricDO && t.status === 'Departed'; });
+  if (fabricDOTrips.length) {
+    await Promise.all(fabricDOTrips.map(async function(t) {
+      var refSuffix = (t.do_no || '').replace(/^DO-\d{8}-/, '');
+      var [scanRes, reqRes] = await Promise.all([
+        sb.from('carton_scans').select('id', { count: 'exact', head: true }).eq('trip_id', t.id),
+        sb.from('production_material_requests').select('id').eq('order_ref', 'FABRIC|' + refSuffix).eq('status', 'Issued').limit(1)
+      ]);
+      t._fabricScannedCount = scanRes.count || 0;
+      var reqId = reqRes.data && reqRes.data[0] ? reqRes.data[0].id : null;
+      if (reqId) {
+        var { data: movs } = await sb.from('raw_material_movements').select('note').eq('type', 'out').like('note', reqId + ' |%');
+        var total = 0;
+        (movs || []).forEach(function(m) {
+          var parts = (m.note || '').split(' | ');
+          total += parts.length - 1;
+        });
+        t._fabricTotalRolls = total;
+      }
+    }));
   }
 
   // Auto-select tab: if has Departed/Arrived or leg2 Assigned trip, go to Delivery; else Pick Up
@@ -602,20 +626,39 @@ function renderTrip(showBack) {
       _destMarker = L.marker([_destCoords.lat, _destCoords.lng], {icon:destIcon}).addTo(_driverMap).bindPopup('<b>🏁 ' + (_trip.destination || 'Destination') + '</b>');
       _driverMap.setView([_destCoords.lat, _destCoords.lng], 14);
     }
-    // Leg 1 → Drop at Warehouse + option to deliver direct; Leg 2 → Arrived
+    // Leg 1 → Drop at Warehouse + Direct Delivery (boutique) OR Scan + Arrived (fabric DO)
     if (_trip.leg === 1) {
-      const whBtn = document.createElement('button');
-      whBtn.className = 'action-btn';
-      whBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
-      whBtn.textContent = '🏭 Drop at Warehouse';
-      whBtn.addEventListener('click', doDropWarehouse);
-      content.appendChild(whBtn);
-      const directBtn = document.createElement('button');
-      directBtn.className = 'action-btn';
-      directBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
-      directBtn.textContent = '🏪 Direct Delivery';
-      directBtn.addEventListener('click', doDirectDelivery);
-      content.appendChild(directBtn);
+      if (_trip._isFabricDO) {
+        const allScanned = _trip._fabricTotalRolls > 0 && _trip._fabricScannedCount >= _trip._fabricTotalRolls;
+        if (allScanned) {
+          const fabArrBtn = document.createElement('button');
+          fabArrBtn.className = 'action-btn btn-arrived';
+          fabArrBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+          fabArrBtn.textContent = '✅ Arrived';
+          fabArrBtn.addEventListener('click', doFabricArrived);
+          content.appendChild(fabArrBtn);
+        } else {
+          const scanBtn2 = document.createElement('button');
+          scanBtn2.className = 'action-btn';
+          scanBtn2.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#6366f1;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+          scanBtn2.textContent = '📦 Scan Roll / Carton';
+          scanBtn2.addEventListener('click', openScan);
+          content.appendChild(scanBtn2);
+        }
+      } else {
+        const whBtn = document.createElement('button');
+        whBtn.className = 'action-btn';
+        whBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+        whBtn.textContent = '🏭 Drop at Warehouse';
+        whBtn.addEventListener('click', doDropWarehouse);
+        content.appendChild(whBtn);
+        const directBtn = document.createElement('button');
+        directBtn.className = 'action-btn';
+        directBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+        directBtn.textContent = '🏪 Direct Delivery';
+        directBtn.addEventListener('click', doDirectDelivery);
+        content.appendChild(directBtn);
+      }
     } else {
       const arrBtn = document.createElement('button');
       arrBtn.className = 'action-btn btn-arrived';
@@ -630,6 +673,23 @@ function renderTrip(showBack) {
       return;
     }
     loadDeliveryCartonBadge(card);
+
+    // Fabric DO: driver confirms POD directly (no boutique staff needed)
+    if (_trip._isFabricDO) {
+      const infoDiv = document.createElement('div');
+      infoDiv.style.cssText = 'text-align:center;padding:1.25rem 0 .5rem;width:100%;max-width:420px';
+      infoDiv.innerHTML = '<div style="font-size:2rem;margin-bottom:.35rem">📍</div>'
+        + '<div style="font-weight:700;margin-bottom:.25rem">Dah Sampai</div>'
+        + '<div style="font-size:.8rem;color:var(--muted);margin-bottom:1rem">' + (_trip.destination || '') + '</div>';
+      content.appendChild(infoDiv);
+      const podBtn = document.createElement('button');
+      podBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#6366f1;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+      podBtn.textContent = '📋 POD';
+      podBtn.addEventListener('click', function(){ viewPOD(_trip.id); });
+      content.appendChild(podBtn);
+      return;
+    }
+
     const infoDiv = document.createElement('div');
     infoDiv.style.cssText = 'text-align:center;padding:1.25rem 0 .5rem;width:100%;max-width:420px';
     infoDiv.innerHTML = '<div style="font-size:2rem;margin-bottom:.35rem">📍</div>'
@@ -737,7 +797,7 @@ async function loadDeliveryCartonBadge(card) {
     const color = expected > 0 ? (scanned >= expected ? '#10b981' : '#f59e0b') : '#3b82f6';
     const b = document.createElement('span');
     b.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:' + color + '20;border:1px solid ' + color + ';color:' + color;
-    b.textContent = '📦 ' + scanned + (expected > 0 ? '/' + expected : '') + ' carton(s) delivered';
+    b.textContent = '📦 ' + scanned + (expected > 0 ? '/' + expected : '') + (_trip._isFabricDO ? ' roll(s) scanned' : ' carton(s) delivered');
     el.appendChild(b);
   }
   card.appendChild(el);
@@ -749,32 +809,52 @@ async function openScan() {
   _scans = [];
   _regCartons = [];
 
-  // Load existing scans in parallel with carton fetch
+  // Load existing scans
   const existRes = await sb.from('carton_scans').select('id, barcode, scanned_at').eq('trip_id', _trip.id).order('scanned_at', { ascending: false });
   (existRes.data || []).forEach(function(s){ _scans.push({ barcode: s.barcode, time: new Date(s.scanned_at), dbId: s.id }); });
 
-  // Fetch cartons: by do_no AND by all batch_nos (for pre-DO printed labels), then merge unique
-  let regData = [];
-  if (_trip.do_no) {
-    const { data: byDo } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').eq('do_no', _trip.do_no).order('carton_no');
-    regData = byDo || [];
-
-    // Also fetch cartons by batch_no for ALL requests in this DO (pre-DO prints may not have do_no set)
-    const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', _trip.do_no);
-    const bkeys = (sr || []).map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
-    if (bkeys.length) {
-      const { data: byBatch } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').in('batch_no', bkeys).order('carton_no');
-      if (byBatch && byBatch.length) {
-        // Merge: add any carton not already in regData (by id)
-        const existingIds = new Set(regData.map(function(c){ return c.id; }));
-        (byBatch || []).forEach(function(c){ if (!existingIds.has(c.id)) regData.push(c); });
-        regData.sort(function(a,b){ return a.carton_no - b.carton_no; });
+  if (_trip._isFabricDO) {
+    // Fabric DO: load roll barcodes from raw_material_movements.note
+    const refSuffix = (_trip.do_no || '').replace(/^DO-\d{8}-/, '');
+    const { data: reqs } = await sb.from('production_material_requests')
+      .select('id').eq('order_ref', 'FABRIC|' + refSuffix).eq('status', 'Issued').limit(1);
+    const reqId = reqs && reqs[0] ? reqs[0].id : null;
+    if (reqId) {
+      const { data: movs } = await sb.from('raw_material_movements')
+        .select('note').eq('type', 'out').like('note', reqId + ' |%');
+      const barcodes = [];
+      (movs || []).forEach(function(m) {
+        const parts = (m.note || '').split(' | ');
+        parts.slice(1).forEach(function(b) { if (b.trim()) barcodes.push(b.trim()); });
+      });
+      _regCartons = barcodes.map(function(b, i) {
+        return { id: i, barcode: b, carton_no: i + 1, total_cartons: barcodes.length, _isFabricRoll: true };
+      });
+    }
+  } else {
+    // Boutique: fetch from cartons table
+    let regData = [];
+    if (_trip.do_no) {
+      const { data: byDo } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').eq('do_no', _trip.do_no).order('carton_no');
+      regData = byDo || [];
+      const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', _trip.do_no);
+      const bkeys = (sr || []).map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
+      if (bkeys.length) {
+        const { data: byBatch } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').in('batch_no', bkeys).order('carton_no');
+        if (byBatch && byBatch.length) {
+          const existingIds = new Set(regData.map(function(c){ return c.id; }));
+          (byBatch || []).forEach(function(c){ if (!existingIds.has(c.id)) regData.push(c); });
+          regData.sort(function(a,b){ return a.carton_no - b.carton_no; });
+        }
       }
     }
+    _regCartons = regData;
   }
-  _regCartons = regData;
 
   document.getElementById('scan-do').textContent = _trip.do_no || '';
+  // Hide depart button for fabric DO delivery (already departed)
+  const departBtn = document.getElementById('depart-btn');
+  if (departBtn) departBtn.style.display = _trip._isFabricDO ? 'none' : '';
   showScreen('screen-scan');
   renderScanList();
   updateScanCount();
@@ -785,8 +865,23 @@ async function openScan() {
 
 function closeScan() {
   stopScanner();
-  showScreen('screen-home');
-  loadTrip(); // refresh scan count badge
+  if (_trip && _trip._isFabricDO) {
+    // Save scan progress on trip object before re-render
+    _trip._fabricScannedCount = _scans.length;
+    _trip._fabricTotalRolls = _regCartons.length;
+    // Sync to _allTrips entry so delivery list also updates
+    var allTripsEntry = (_allTrips || []).find(function(t){ return t.id === _trip.id; });
+    if (allTripsEntry) {
+      allTripsEntry._fabricScannedCount = _scans.length;
+      allTripsEntry._fabricTotalRolls = _regCartons.length;
+    }
+    showScreen('screen-home');
+    if (_currentTab === 'delivery') renderDeliveryList();
+    else renderTrip();
+  } else {
+    showScreen('screen-home');
+    loadTrip();
+  }
 }
 
 // ── CAMERA SCANNER ────────────────────────────────
@@ -834,7 +929,30 @@ async function processBarcode(barcode) {
   const isDup = _scans.some(function(s){ return s.barcode === barcode; });
   if (isDup) { flashDuplicate(barcode); return; }
 
-  // Validate against registered cartons table — exact match first
+  // ── FABRIC ROLL: validate against _regCartons list ────────────
+  if (_trip._isFabricDO) {
+    const isValid = _regCartons.some(function(c){ return c.barcode === barcode; });
+    if (!isValid) {
+      const statusEl = document.getElementById('scan-status');
+      if (statusEl) {
+        statusEl.textContent = '⚠️ Roll tidak dalam senarai pick!';
+        statusEl.style.color = '#ef4444';
+        setTimeout(function(){ statusEl.textContent = ''; }, 3000);
+      }
+      return;
+    }
+    const { data, error } = await sb.from('carton_scans').insert({
+      trip_id: _trip.id, do_no: _trip.do_no, barcode: barcode,
+      driver_id: _driver.id, scanned_at: new Date().toISOString()
+    }).select('id').single();
+    if (error) { console.error(error); return; }
+    _scans.unshift({ barcode, time: new Date(), dbId: data ? data.id : null });
+    renderScanList();
+    updateScanCount();
+    return;
+  }
+
+  // ── BOUTIQUE CARTON: validate against cartons table ───────────
   let { data: regCarton } = await sb.from('cartons')
     .select('id, do_no, carton_no, total_cartons, barcode')
     .eq('barcode', barcode)
@@ -942,12 +1060,45 @@ function renderScanList() {
 
   const scannedBarcodes = _scans.map(function(s){ return s.barcode; });
 
-  // Show registered carton checklist if available
+  // Show registered carton/roll checklist if available
   if (_regCartons.length) {
+    const isFabric = _trip && _trip._isFabricDO;
     // Main header
     const header = document.createElement('div');
     header.style.cssText = 'padding:.5rem 1rem;font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em';
-    header.textContent = 'Carton List (' + _regCartons.length + ')';
+    const scannedCount = _regCartons.filter(function(c){ return scannedBarcodes.includes(c.barcode); }).length;
+    header.textContent = (isFabric ? 'Roll List' : 'Carton List') + ' (' + scannedCount + ' / ' + _regCartons.length + ')';
+
+    // ── FABRIC ROLL: simple flat list ─────────────────────────
+    if (isFabric) {
+      list.appendChild(header);
+      _regCartons.forEach(function(c, idx) {
+        const isScanned = scannedBarcodes.includes(c.barcode);
+        const scanEntry = isScanned ? _scans.find(function(s){ return s.barcode === c.barcode; }) : null;
+        const timeStr = scanEntry ? scanEntry.time.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+        const scanIdx = isScanned ? _scans.findIndex(function(s){ return s.barcode === c.barcode; }) : -1;
+        const item = document.createElement('div');
+        item.className = 'scan-item';
+        item.style.cssText = 'transition:background .25s,border-color .25s;' + (isScanned ? 'background:#10b98115;border-color:#10b981' : '');
+        item.innerHTML =
+          '<div style="flex:1;min-width:0">'
+          + '<div class="scan-barcode" style="' + (isScanned ? 'color:#10b981' : '') + '">' + (c.barcode || '—') + '</div>'
+          + '<div class="scan-time">Roll ' + (idx + 1) + ' / ' + _regCartons.length + (timeStr ? ' &nbsp;·&nbsp; ' + timeStr : '') + '</div>'
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">'
+          + (isScanned
+              ? '<span style="color:#10b981;font-size:1.1rem;font-weight:700">✓</span>'
+                + '<button class="delete-scan" data-idx="' + scanIdx + '" style="opacity:.5">✕</button>'
+              : '<span style="color:var(--border);font-size:1rem">○</span>')
+          + '</div>';
+        list.appendChild(item);
+      });
+      // attach delete handlers
+      list.querySelectorAll('.delete-scan').forEach(function(btn){
+        btn.addEventListener('click', function(){ deleteScan(parseInt(btn.dataset.idx)); });
+      });
+      return;
+    }
     list.appendChild(header);
 
     // Group cartons by STO (sto_no field in barcode: C{n}|{STO}|...)
@@ -1272,6 +1423,31 @@ async function doArrived() {
   renderTrip();
 }
 
+// ── FABRIC DO: ARRIVED (from list view) ──────────
+async function doFabricArrivedForTrip(tripId) {
+  const trip = (_allTrips || []).find(function(t){ return t.id === tripId; });
+  if (!trip) return;
+  _trip = trip;
+  await doFabricArrived();
+}
+
+// ── FABRIC DO: ARRIVED ────────────────────────────
+async function doFabricArrived() {
+  if (!_trip) return;
+  if (!confirm('Confirm dah sampai di ' + (_trip.destination || 'destinasi') + '?')) return;
+  stopGPS();
+  const { error } = await sb.from('fleet_trips').update({
+    status: 'Arrived', arrival_time: new Date().toISOString()
+  }).eq('id', _trip.id);
+  if (error) { alert('Error: ' + error.message); return; }
+  if (_trip.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', _trip.vehicle_id);
+  await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+  document.getElementById('trip-map-wrap').style.display = 'none';
+  _trip.status = 'Arrived';
+  if (_currentTab === 'delivery') renderDeliveryList();
+  else renderTrip();
+}
+
 // ═══════════════════════════════════════════════════
 // DELIVERY LIST — multi-trip drag & drop + POD
 // ═══════════════════════════════════════════════════
@@ -1536,11 +1712,24 @@ function buildDeliveryItem(trip, idx) {
   let statusText = '🚚 In Transit';
   let actionHTML;
   if (trip.leg === 1) {
-    // Leg 1 departed: drop at warehouse or direct delivery
-    actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
-      + '<button class="btn-arrived-sm" style="background:#3b82f6" onclick="markDropWarehouse(\'' + trip.id + '\',\'' + (trip.vehicle_id||'') + '\')">🏭 Drop at Warehouse</button>'
-      + '<button class="btn-arrived-sm" style="background:#10b981" onclick="markDirectDelivery(\'' + trip.id + '\')">🏪 Direct Delivery</button>'
-      + '</div>';
+    // Leg 1 departed: fabric DO → scan then arrived; boutique → drop at warehouse or direct delivery
+    if (trip._isFabricDO) {
+      const allFabricScanned = trip._fabricTotalRolls > 0 && trip._fabricScannedCount >= trip._fabricTotalRolls;
+      if (allFabricScanned) {
+        actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
+          + '<button class="btn-arrived-sm" style="background:#10b981" onclick="doFabricArrivedForTrip(\'' + trip.id + '\')">✅ Arrived</button>'
+          + '</div>';
+      } else {
+        actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
+          + '<button class="btn-arrived-sm" style="background:#6366f1" onclick="openScanForTrip(\'' + trip.id + '\')">📦 Scan Roll / Carton</button>'
+          + '</div>';
+      }
+    } else {
+      actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
+        + '<button class="btn-arrived-sm" style="background:#3b82f6" onclick="markDropWarehouse(\'' + trip.id + '\',\'' + (trip.vehicle_id||'') + '\')">🏭 Drop at Warehouse</button>'
+        + '<button class="btn-arrived-sm" style="background:#10b981" onclick="markDirectDelivery(\'' + trip.id + '\')">🏪 Direct Delivery</button>'
+        + '</div>';
+    }
   } else if (trip.status === 'Assigned') {
     // Leg 2 assigned: must scan cartons at warehouse first, then depart
     statusText = '📋 Assigned — Scan cartons to depart';
@@ -1556,8 +1745,13 @@ function buildDeliveryItem(trip, idx) {
     statusText = '✅ POD Confirmed';
     actionHTML = '<button class="btn-pod" onclick="viewPOD(\'' + trip.id + '\')">📄 View POD</button>';
   } else if (isArrived) {
-    statusText = '📍 Arrived — Awaiting staff carton scan';
-    actionHTML = '<span class="btn-waiting">⏳ Awaiting boutique confirmation...</span>';
+    if (trip._isFabricDO) {
+      statusText = '📍 Arrived';
+      actionHTML = '<button class="btn-pod" onclick="viewPOD(\'' + trip.id + '\')">📋 POD</button>';
+    } else {
+      statusText = '📍 Arrived — Awaiting staff carton scan';
+      actionHTML = '<span class="btn-waiting">⏳ Awaiting boutique confirmation...</span>';
+    }
   }
 
   item.innerHTML =
