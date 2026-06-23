@@ -1,0 +1,2842 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#0f172a"/>
+<link rel="manifest" href="rawmat-manifest.json"/>
+<title>Raw Material App</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+/* ─── RESET & VARS ─────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg:     #0f172a;
+  --card:   #1e293b;
+  --border: #334155;
+  --text:   #f1f5f9;
+  --muted:  #94a3b8;
+  --orange: #fb923c;
+  --green:  #10b981;
+  --yellow: #f59e0b;
+  --red:    #ef4444;
+  --blue:   #3b82f6;
+  --cyan:   #06b6d4;
+}
+body { background: #0a0f1e; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; justify-content: center; }
+
+/* ─── PHONE WRAPPER ────────────────────────── */
+#app-shell { position: relative; width: 100%; max-width: 430px; min-height: 100vh; background: var(--bg); box-shadow: 0 0 60px rgba(0,0,0,.6); display: flex; flex-direction: column; }
+
+/* ─── SCREENS ──────────────────────────────── */
+.screen { display: none; flex-direction: column; flex: 1; }
+.screen.active { display: flex; }
+
+/* ─── LOGIN ────────────────────────────────── */
+#screen-login { display: none; align-items: center; justify-content: center; padding: 2rem 1.25rem; flex: 1; }
+#screen-login.active { display: flex; }
+.login-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem 1.5rem; width: 100%; max-width: 380px; }
+.login-logo  { font-size: 3rem; text-align: center; margin-bottom: .5rem; }
+.login-title { font-size: 1.2rem; font-weight: 800; text-align: center; margin-bottom: .2rem; }
+.login-sub   { font-size: .78rem; color: var(--muted); text-align: center; margin-bottom: 1.5rem; }
+.inp { width: 100%; padding: .7rem .9rem; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: .9rem; outline: none; margin-bottom: .75rem; }
+.inp:focus { border-color: var(--orange); }
+.btn-primary { width: 100%; padding: .8rem; background: var(--orange); color: #fff; border: none; border-radius: 10px; font-size: .95rem; font-weight: 700; cursor: pointer; }
+.btn-primary:active { opacity: .85; }
+.login-err { color: var(--red); font-size: .78rem; text-align: center; display: none; margin-top: .75rem; }
+
+/* ─── TOP BAR ──────────────────────────────── */
+.topbar { position: sticky; top: 0; left: 0; right: 0; z-index: 100; background: var(--card); border-bottom: 1px solid var(--border); padding: .75rem 1rem; display: flex; align-items: center; justify-content: space-between; }
+.topbar-title { font-size: .9rem; font-weight: 700; color: var(--orange); }
+.topbar-right { display: flex; align-items: center; gap: .75rem; }
+.topbar-user  { font-size: .72rem; color: var(--muted); }
+.btn-logout { font-size: .68rem; padding: .25rem .6rem; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+
+/* ─── MAIN CONTENT ─────────────────────────── */
+.main-screen { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.content-pad { padding: .9rem 1rem 1.5rem; }
+
+/* ─── MENU GRID ─────────────────────────────── */
+.menu-grid  { display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; gap: .75rem; height: 100%; }
+.menu-card  { background: var(--card); border: 1px solid var(--border); border-radius: 20px; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; padding: 1rem; transition: border-color .2s, background .2s; }
+.menu-card:active { background: #263249; border-color: var(--orange); transform: scale(.97); }
+.menu-icon  { font-size: 3rem; line-height: 1; }
+.menu-label { font-size: .92rem; font-weight: 800; }
+.menu-desc  { font-size: .68rem; color: var(--muted); line-height: 1.5; padding: 0 .25rem; }
+
+/* ─── CARDS ─────────────────────────────────── */
+.po-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: .9rem 1rem; margin-bottom: .65rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.po-card:active { opacity: .75; }
+.po-name { font-size: .88rem; font-weight: 700; }
+.po-sub  { font-size: .72rem; color: var(--muted); margin-top: .15rem; }
+.badge { display: inline-block; padding: .2rem .55rem; border-radius: 20px; font-size: .68rem; font-weight: 700; margin-top: .3rem; }
+.arrow { color: var(--orange); font-size: 1.2rem; flex-shrink: 0; margin-left: .5rem; }
+
+/* ─── REQ CARD ──────────────────────────────── */
+.req-card { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--cyan); border-radius: 12px; padding: .9rem 1rem; margin-bottom: .65rem; cursor: pointer; }
+.req-card:active { opacity: .75; }
+.req-name { font-size: .88rem; font-weight: 700; }
+.req-sub  { font-size: .72rem; color: var(--muted); margin-top: .2rem; }
+.req-badges { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .45rem; }
+.req-badge { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .1rem .45rem; font-size: .65rem; color: var(--muted); }
+
+/* ─── MODAL ─────────────────────────────────── */
+.modal-overlay { display: none; position: absolute; inset: 0; background: rgba(0,0,0,.65); z-index: 200; align-items: flex-end; }
+.modal-overlay.open { display: flex; }
+.modal-sheet { background: var(--card); border-radius: 20px 20px 0 0; padding: 1.25rem 1rem 2.5rem; width: 100%; max-height: 88vh; overflow-y: auto; }
+.modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 1rem; }
+.modal-title  { font-size: 1rem; font-weight: 800; margin-bottom: .25rem; }
+.modal-sub    { font-size: .78rem; color: var(--muted); margin-bottom: 1rem; }
+
+.recv-item { background: var(--bg); border-radius: 10px; padding: .75rem; margin-bottom: .6rem; }
+.recv-item-name { font-size: .85rem; font-weight: 700; margin-bottom: .2rem; }
+.recv-item-sub  { font-size: .7rem; color: var(--muted); margin-bottom: .4rem; }
+.recv-input { width: 100%; padding: .6rem .75rem; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: .88rem; outline: none; }
+.recv-input:focus { border-color: var(--orange); }
+
+.btn-row { display: flex; gap: .75rem; margin-top: 1.25rem; }
+.btn-cancel  { flex: 1; padding: .7rem; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 10px; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.btn-confirm { flex: 1; padding: .7rem; background: var(--green); color: #fff; border: none; border-radius: 10px; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.btn-confirm:disabled { opacity: .6; cursor: default; }
+.btn-issue   { flex: 1; padding: .7rem; background: var(--cyan); color: #000; border: none; border-radius: 10px; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.btn-issue:disabled { opacity: .6; cursor: default; }
+.form-err { color: var(--red); font-size: .75rem; margin-top: .5rem; display: none; }
+
+/* ─── STICKER SCREEN ───────────────────────── */
+#screen-stickers { display: flex; flex-direction: column; }
+.sticker-topbar { position: sticky; top: 0; z-index: 100; background: var(--card); border-bottom: 1px solid var(--border); padding: .75rem 1rem; display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
+.sticker-topbar-title { font-size: .9rem; font-weight: 700; flex: 1; }
+.btn-back  { background: transparent; border: none; color: var(--text); font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 0 .25rem; }
+.btn-print { font-size: .72rem; padding: .35rem .75rem; background: var(--orange); color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+
+.sticker-setup { padding: .9rem 1rem 2rem; flex: 1; overflow-y: auto; }
+.sticker-intro { font-size: .78rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.6; }
+.sticker-mat-block { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+.sticker-mat-name { font-size: .88rem; font-weight: 700; color: var(--orange); margin-bottom: .85rem; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-bottom: .6rem; }
+.field { margin-bottom: .6rem; }
+.field label { font-size: .7rem; color: var(--muted); display: block; margin-bottom: .25rem; }
+.field input, .field select { width: 100%; padding: .55rem .75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: .85rem; outline: none; }
+.field input:focus { border-color: var(--orange); }
+.btn-generate { width: 100%; padding: .8rem; background: var(--orange); color: #fff; border: none; border-radius: 10px; font-size: .95rem; font-weight: 700; cursor: pointer; margin-bottom: .6rem; }
+.btn-skip { width: 100%; padding: .7rem; border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 10px; font-size: .85rem; cursor: pointer; }
+
+.sticker-preview { padding: .9rem 1rem 2rem; flex: 1; overflow-y: auto; }
+.sticker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.sticker-card { background: #fff; color: #000; border-radius: 8px; padding: .65rem; display: flex; flex-direction: column; align-items: center; gap: .35rem; }
+.sticker-card canvas { width: 100px !important; height: 100px !important; display: block; }
+.sticker-card-name { font-size: .62rem; font-weight: 800; text-align: center; color: #111; line-height: 1.3; max-width: 110px; }
+.sticker-card-info { font-size: .55rem; color: #444; text-align: center; line-height: 1.55; }
+.sticker-card-id   { font-size: .48rem; color: #888; font-family: monospace; text-align: center; }
+
+/* ─── MISC ─────────────────────────────────── */
+.empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+.empty-icon { font-size: 2.5rem; opacity: .35; margin-bottom: .75rem; }
+.empty-text { font-size: .85rem; line-height: 1.6; }
+.loading { text-align: center; padding: 2rem; color: var(--muted); font-size: .82rem; }
+.section-label { font-size: .72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .75rem; }
+
+#toast { position: absolute; bottom: 5.5rem; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--border); color: var(--text); padding: .6rem 1.25rem; border-radius: 20px; font-size: .8rem; font-weight: 600; z-index: 400; opacity: 0; transition: opacity .3s; white-space: nowrap; pointer-events: none; }
+#toast.show { opacity: 1; }
+
+/* ─── LANG TOGGLE ───────────────────────────── */
+.lang-toggle { font-size: .68rem; font-weight: 800; padding: .2rem .55rem; border-radius: 6px; border: 1px solid var(--orange); background: transparent; color: var(--orange); cursor: pointer; letter-spacing: .04em; }
+.lang-toggle:active { background: var(--orange); color: #fff; }
+
+/* ─── PRINT ─────────────────────────────────── */
+@media print {
+  #screen-login, #screen-home, #screen-receive, #screen-pick, #screen-dispatch, .modal-overlay, #toast { display: none !important; }
+  #screen-stickers { display: block !important; }
+  .sticker-topbar, .sticker-setup, .btn-skip, .btn-generate { display: none !important; }
+  .sticker-preview { padding: 0; }
+  .sticker-grid { grid-template-columns: repeat(3, 1fr); gap: .4rem; }
+  .sticker-card { border: 1px dashed #ccc; page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div id="app-shell">
+
+<div id="toast"></div>
+
+<!-- ══════════ QR SCAN OVERLAY ══════════ -->
+<div id="scan-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#000;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:#0f172a">
+    <button onclick="pauseScan()" style="background:none;border:none;color:#f1f5f9;font-size:1.4rem;cursor:pointer">‹</button>
+    <div style="color:#f1f5f9;font-weight:700;font-size:.95rem" id="scan-title">Scan QR Roll</div>
+  </div>
+  <div style="position:relative;flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center">
+    <video id="scan-video" style="width:100%;height:100%;object-fit:cover" playsinline autoplay muted></video>
+    <canvas id="scan-canvas" style="display:none"></canvas>
+    <!-- Viewfinder -->
+    <div style="position:absolute;width:220px;height:220px;border:3px solid #f97316;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.55)"></div>
+    <div id="scan-hint" style="position:absolute;bottom:2.5rem;color:#fff;font-size:.8rem;text-align:center;padding:0 2rem;opacity:.85">Arahkan ke QR stiker roll</div>
+    <div id="scan-overlay-err" style="display:none;position:absolute;top:1rem;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;font-size:.8rem;font-weight:700;padding:.45rem .9rem;border-radius:8px;white-space:nowrap;z-index:2"></div>
+  </div>
+  <!-- Manual / barcode scanner input -->
+  <div style="background:#0f172a;padding:.5rem .9rem;border-top:1px solid #1e293b;display:flex;gap:.5rem">
+    <input id="scan-manual-input" type="text" placeholder="Scan atau taip QR code di sini..."
+      style="flex:1;padding:.5rem .75rem;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:.82rem;outline:none;font-family:monospace"
+      onkeydown="if(event.key==='Enter'){onQrScanned(this.value.trim());this.value='';}"
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <button onclick="const v=document.getElementById('scan-manual-input');if(v.value.trim()){onQrScanned(v.value.trim());v.value='';}"
+      style="padding:.5rem .85rem;background:#f97316;color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap">OK</button>
+  </div>
+  <!-- Roll list panel -->
+  <div id="scan-roll-list" style="background:#0f172a;padding:.6rem .9rem;max-height:30vh;overflow-y:auto"></div>
+</div>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div class="screen active" id="screen-login">
+  <div class="login-card">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:.75rem">
+      <button class="lang-toggle" onclick="toggleLang()"><span id="lang-label">EN</span></button>
+    </div>
+    <div class="login-logo">🧵</div>
+    <div class="login-title">Raw Material App</div>
+    <div class="login-sub" data-i18n="login_sub">Terima Bahan &amp; Pick Requests</div>
+    <input class="inp" id="inp-username" type="text" data-i18n-ph="username" placeholder="Nama Pengguna" autocomplete="username"/>
+    <input class="inp" id="inp-password" type="password" data-i18n-ph="password" placeholder="Kata Laluan" autocomplete="current-password"/>
+    <button class="btn-primary" onclick="doLogin()" data-i18n="login_btn">Log Masuk</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ══════════ HOME ══════════ -->
+<div class="screen" id="screen-home">
+  <div class="topbar">
+    <div class="topbar-title">🧵 Raw Material</div>
+    <div class="topbar-right">
+      <span class="topbar-user" id="topbar-user"></span>
+      <button class="lang-toggle" onclick="toggleLang()"><span id="lang-label-home">EN</span></button>
+      <button class="btn-logout" onclick="doLogout()" data-i18n="logout">Log Keluar</button>
+    </div>
+  </div>
+  <div class="main-screen" style="display:flex;flex-direction:column;">
+    <div class="content-pad" style="flex:1;display:flex;flex-direction:column;padding-bottom:1rem;">
+      <div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem" data-i18n="select_fn">Pilih Fungsi</div>
+      <div class="menu-grid" style="flex:1;">
+
+        <div class="menu-card" onclick="goSection('receive')" style="position:relative">
+          <div id="receive-badge" style="display:none;position:absolute;top:.5rem;right:.5rem;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:99px;padding:.15rem .45rem;min-width:1.2rem;text-align:center"></div>
+          <div class="menu-icon">📦</div>
+          <div class="menu-label" data-i18n="receive_title">Receive Bahan</div>
+          <div class="menu-desc" id="receive-badge-desc" data-i18n="receive_desc">Terima PO & jana stiker QR</div>
+        </div>
+
+        <div class="menu-card" onclick="goSection('pick')" style="position:relative">
+          <div id="pick-badge-dot" style="display:none;position:absolute;top:.5rem;right:.5rem;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:99px;padding:.15rem .45rem;min-width:1.2rem;text-align:center"></div>
+          <div class="menu-icon">📋</div>
+          <div class="menu-label" data-i18n="pick_title">Pick Request</div>
+          <div class="menu-desc" id="pick-badge-desc" data-i18n="pick_desc">Issue bahan ke production</div>
+        </div>
+
+        <div class="menu-card" onclick="goSection('dispatch')" style="position:relative">
+          <div id="dispatch-badge" style="display:none;position:absolute;top:.5rem;right:.5rem;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:99px;padding:.15rem .45rem;min-width:1.2rem;text-align:center"></div>
+          <div class="menu-icon">🚐</div>
+          <div class="menu-label">Dispatch</div>
+          <div class="menu-desc" id="dispatch-badge-desc">Hantar DO ke fleet</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ RECEIVE SCREEN ══════════ -->
+<div class="screen" id="screen-receive">
+  <div class="topbar">
+    <button class="btn-back" onclick="goHome()" style="font-size:1.3rem;margin-right:.5rem">‹</button>
+    <div class="topbar-title" data-i18n="receive_title">📦 Receive Bahan</div>
+    <div class="topbar-right">
+      <button class="btn-logout" onclick="loadPOList()" style="font-size:.75rem">↻</button>
+    </div>
+  </div>
+  <div class="main-screen">
+    <div class="content-pad">
+      <div id="po-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PICK REQUEST SCREEN ══════════ -->
+<div class="screen" id="screen-pick">
+  <div class="topbar">
+    <button class="btn-back" onclick="goHome()" style="font-size:1.3rem;margin-right:.5rem">‹</button>
+    <div class="topbar-title" data-i18n="pick_title">📋 Pick Request</div>
+    <div class="topbar-right">
+      <button class="btn-logout" onclick="loadPickRequests()" style="font-size:.75rem">↻</button>
+    </div>
+  </div>
+  <div class="main-screen">
+    <div class="content-pad">
+      <div id="req-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ DISPATCH SCREEN ══════════ -->
+<div class="screen" id="screen-dispatch">
+  <div class="topbar">
+    <button class="btn-back" onclick="goHome()" style="font-size:1.3rem;margin-right:.5rem">‹</button>
+    <div class="topbar-title">🚐 Dispatch</div>
+    <div class="topbar-right">
+      <button class="btn-logout" onclick="loadDispatchList()" style="font-size:.75rem">↻</button>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div id="dispatch-list" style="padding:.75rem 0"></div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL ══════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="onOverlayClick(event)">
+  <div class="modal-sheet" id="modal-sheet"></div>
+</div>
+
+<!-- ══════════ STICKER SCREEN ══════════ -->
+<div class="screen" id="screen-stickers">
+  <div class="sticker-setup" id="sticker-setup"></div>
+  <div class="sticker-preview" id="sticker-preview" style="display:none;padding:.9rem 1rem 2rem;flex:1;overflow-y:auto"></div>
+</div>
+
+</div><!-- /app-shell -->
+
+<!-- ══════════ SCRIPT ══════════ -->
+<script>
+/* ─── SUPABASE ──────────────────────────────── */
+const SUPA_URL = 'https://lrathqgqspkiiwumsoar.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyYXRocWdxc3BraWl3dW1zb2FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTk4OTIsImV4cCI6MjA5NjQ5NTg5Mn0.UIu3uMD5SXZ4WyzCuKt27iJvEvL4FO2a-Tg9-cHbaNg';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+/* ─── STATE ─────────────────────────────────── */
+let _user       = null;
+let _stickerCtx = { poNo: '', ops: [] };
+
+/* ════════════════════════════════════════════
+   AUTH
+════════════════════════════════════════════ */
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function doLogin() {
+  const username = document.getElementById('inp-username').value.trim();
+  const password = document.getElementById('inp-password').value;
+  const errEl    = document.getElementById('login-err');
+  errEl.style.display = 'none';
+  if (!username || !password) { errEl.textContent = t('login_err1'); errEl.style.display = 'block'; return; }
+
+  const hash = await sha256(password);
+  const { data, error } = await sb.from('app_users')
+    .select('id, username, full_name, role, status')
+    .eq('username', username).eq('password_hash', hash).eq('status', 'Active').maybeSingle();
+
+  if (error || !data) { errEl.textContent = t('login_err2'); errEl.style.display = 'block'; return; }
+
+  _user = data;
+  localStorage.setItem('rm_user', JSON.stringify(_user));
+  onLoggedIn();
+}
+
+function doLogout() {
+  _user = null;
+  localStorage.removeItem('rm_user');
+  goScreen('screen-login');
+}
+
+function checkSession() {
+  try {
+    const saved = localStorage.getItem('rm_user');
+    if (saved) { _user = JSON.parse(saved); onLoggedIn(); }
+  } catch(e) { localStorage.removeItem('rm_user'); }
+}
+
+function onLoggedIn() {
+  document.getElementById('topbar-user').textContent = _user.full_name || _user.username;
+  goHome();
+  loadPickBadge();
+}
+
+/* ════════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════════ */
+function goScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goHome() {
+  goScreen('screen-home');
+  loadPickBadge();
+}
+
+function goSection(section) {
+  if (section === 'receive')  { goScreen('screen-receive');  loadPOList(); }
+  if (section === 'pick')     { goScreen('screen-pick');     loadPickRequests(); }
+  if (section === 'dispatch') { goScreen('screen-dispatch'); loadDispatchList(); }
+}
+
+async function loadDispatchList() {
+  const el = document.getElementById('dispatch-list');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">⏳ Loading...</div>';
+
+  // Fetch issued fabric requests
+  const { data: reqs } = await sb.from('production_material_requests')
+    .select('id, order_ref, reason, reviewed_at, reviewed_by')
+    .eq('status', 'Issued')
+    .like('order_ref', 'FABRIC|%')
+    .order('reviewed_at', { ascending: false });
+
+  if (!reqs || !reqs.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.85rem">Tiada DO pending dispatch</div>';
+    return;
+  }
+
+  // Compute DO numbers + check existing fleet trips
+  const withDo = reqs.map(function(r) {
+    const date = r.reviewed_at ? new Date(r.reviewed_at) : new Date();
+    const refSuffix = (r.order_ref||'').replace('FABRIC|','').replace(/^—$/,'').trim() || r.id.slice(-4).toUpperCase();
+    const doNo = 'DO-' + date.getFullYear() + ('0'+(date.getMonth()+1)).slice(-2) + ('0'+date.getDate()).slice(-2) + '-' + refSuffix;
+    let info = {};
+    try { info = JSON.parse(r.reason || '{}'); } catch(e) {}
+    return { ...r, doNo, info };
+  });
+  const doNums = withDo.map(r => r.doNo);
+  const { data: trips } = await sb.from('fleet_trips').select('do_no, status, driver_id, driver:driver_id(name), vehicle:vehicle_id(plate_no)').in('do_no', doNums);
+  const tripByDo = {};
+  (trips || []).forEach(t => { tripByDo[t.do_no] = t; });
+
+  // Update dispatch badge
+  const pending = withDo.filter(r => !tripByDo[r.doNo]);
+  const dot = document.getElementById('dispatch-badge');
+  const desc = document.getElementById('dispatch-badge-desc');
+  if (dot)  { dot.textContent = pending.length; dot.style.display = pending.length ? 'block' : 'none'; }
+  if (desc) { desc.textContent = pending.length ? pending.length + ' pending dispatch' : 'Hantar DO ke fleet'; desc.style.color = pending.length ? 'var(--cyan)' : ''; }
+
+  el.innerHTML = '';
+  withDo.forEach(function(r) {
+    const trip = tripByDo[r.doNo];
+    const dest = r.info.destination || '—';
+    const ref  = (r.order_ref || '').replace('FABRIC|','');
+    const items = r.info.items || [];
+    const totalRolls = items.reduce((s, it) => s + (it.rolls || 0), 0);
+    const isDispatched  = !!trip;
+    const hasDriver     = trip && trip.driver_id;
+
+    const cardId = 'dcard-' + r.id;
+    const itemsHtml = items.map(it =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border)">
+        <div>
+          <span style="font-weight:700;font-size:.82rem;color:var(--orange)">${it.code}</span>
+          <span style="font-size:.68rem;color:var(--muted);margin-left:.35rem">${it.gsm}</span>
+        </div>
+        <div style="font-size:.78rem;font-weight:700">${it.rolls} roll <span style="font-size:.65rem;color:var(--muted);font-weight:400">· ${(it.meter||0).toFixed(1)}m</span></div>
+      </div>`
+    ).join('');
+
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:14px;padding:.85rem 1rem;margin-bottom:.65rem';
+    card.innerHTML = `
+      <div style="cursor:pointer" onclick="const d=document.getElementById('${cardId}');d.style.display=d.style.display==='none'?'block':'none'">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.4rem">
+          <div style="font-size:.72rem;font-family:monospace;color:var(--cyan)">${r.doNo}</div>
+          <div style="font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:99px;background:${hasDriver?'rgba(16,185,129,.15)':isDispatched?'rgba(99,102,241,.15)':'rgba(249,115,22,.12)'};color:${hasDriver?'var(--green)':isDispatched?'#6366f1':'var(--orange)'}">
+            ${hasDriver ? '✅ Driver Assigned' : isDispatched ? '⏳ Tunggu Driver' : '📦 Pending'}
+          </div>
+        </div>
+        <div style="font-size:.9rem;font-weight:800;margin-bottom:.2rem">→ ${dest}</div>
+        <div style="font-size:.68rem;color:var(--muted)">${ref !== '—' ? 'Ref: '+ref+' · ' : ''}${totalRolls} roll · ${r.reviewed_by || '—'} <span style="opacity:.4">▾</span></div>
+      </div>
+      <div id="${cardId}" style="display:none;margin-top:.6rem;border-top:1px solid var(--border);padding-top:.6rem">
+        ${itemsHtml}
+        ${isDispatched
+          ? `<div style="font-size:.72rem;color:${hasDriver?'var(--green)':'var(--muted)'};margin-top:.6rem">🚐 ${trip.vehicle?.plate_no||'—'} · 👤 ${trip.driver?.name||'Belum assign'} · ${trip.status}</div>`
+          : ''
+        }
+      </div>
+      ${!isDispatched
+        ? `<button onclick="openDispatchModal('${r.doNo}', '${dest.replace(/'/g,"\\'")}', '${r.id}')"
+             style="width:100%;padding:.6rem;background:var(--orange);border:none;border-radius:9px;color:#fff;font-size:.85rem;font-weight:700;cursor:pointer;margin-top:.65rem">
+             🚐 Dispatch ke Fleet
+           </button>`
+        : hasDriver
+          ? `<button onclick="printFabricDO('${r.id}')"
+               style="width:100%;padding:.6rem;background:var(--green);border:none;border-radius:9px;color:#fff;font-size:.85rem;font-weight:700;cursor:pointer;margin-top:.65rem">
+               🖨️ Print DO
+             </button>`
+          : `<div style="text-align:center;padding:.5rem;font-size:.75rem;color:var(--muted);margin-top:.65rem">⏳ Tunggu fleet assign driver...</div>`
+      }
+    `;
+    el.appendChild(card);
+  });
+}
+
+async function loadPickBadge() {
+  const [{ count: pickCount }, { count: poCount }] = await Promise.all([
+    sb.from('production_material_requests').select('id', { count: 'exact', head: true }).eq('status', 'Approved'),
+    sb.from('raw_material_po').select('id', { count: 'exact', head: true }).in('status', ['Submitted','Partially Received'])
+  ]);
+
+  // Pick badge
+  const pickDesc = document.getElementById('pick-badge-desc');
+  const pickDot  = document.getElementById('pick-badge-dot');
+  if (pickDesc) { pickDesc.textContent = pickCount > 0 ? pickCount + t('pick_pending') : t('pick_desc'); pickDesc.style.color = pickCount > 0 ? 'var(--cyan)' : ''; }
+  if (pickDot)  { pickDot.textContent = pickCount; pickDot.style.display = pickCount > 0 ? 'block' : 'none'; }
+
+  // Receive badge
+  const recvDesc = document.getElementById('receive-badge-desc');
+  const recvDot  = document.getElementById('receive-badge');
+  if (recvDesc) { recvDesc.textContent = poCount > 0 ? poCount + ' PO pending' : t('receive_desc'); recvDesc.style.color = poCount > 0 ? 'var(--cyan)' : ''; }
+  if (recvDot)  { recvDot.textContent = poCount; recvDot.style.display = poCount > 0 ? 'block' : 'none'; }
+}
+
+/* ════════════════════════════════════════════
+   TOAST & MODAL
+════════════════════════════════════════════ */
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function openModal(html) {
+  document.getElementById('modal-sheet').innerHTML = '<div class="modal-handle"></div>' + html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+function onOverlayClick(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+/* ════════════════════════════════════════════
+   RECEIVE — FORM-FIRST FLOW
+   1. User picks material + qty
+   2. Selects PO at bottom (optional)
+   3. Confirm → update stock + PO
+════════════════════════════════════════════ */
+let _recvMats = [];   // all raw_materials
+let _recvPOs  = [];   // available POs
+
+async function loadPOList() {
+  const el = document.getElementById('po-list');
+  el.innerHTML = '<div class="loading">' + t('loading') + '</div>';
+
+  // Load materials + all POs
+  const [{ data: mats }, { data: pos }] = await Promise.all([
+    sb.from('raw_materials').select('id, name, unit, current_stock, is_fabric_roll').order('name'),
+    sb.from('raw_material_po').select('id, po_no, supplier_name, status, created_at')
+      .order('created_at', { ascending: false }).limit(50)
+  ]);
+
+  _recvMats = mats || [];
+  _recvPOs  = pos  || [];
+
+  const statusLabel = { 'Submitted': 'Submitted', 'Partially Received': 'Partial', 'Received': 'Received' };
+  const statusColor = { 'Submitted': 'var(--orange)', 'Partially Received': 'var(--yellow)', 'Received': 'var(--green)' };
+
+  const pendingPOs  = _recvPOs.filter(p => p.status === 'Submitted' || p.status === 'Partially Received');
+  const receivedPOs = _recvPOs.filter(p => p.status === 'Received');
+
+  const manualBtn = `<button onclick="openReceiveForm()"
+    style="width:100%;padding:.7rem;background:transparent;color:var(--muted);border:1px dashed var(--border);border-radius:12px;font-size:.8rem;font-weight:600;cursor:pointer;margin-top:.75rem">
+    + ${_lang === 'bm' ? 'Terima Manual (Tanpa PO)' : 'Manual Receive (No PO)'}
+  </button>`;
+
+  function renderPOCard(p, clickable) {
+    const sCol = statusColor[p.status] || 'var(--muted)';
+    const sLbl = statusLabel[p.status] || p.status;
+    const date = p.created_at ? new Date(p.created_at).toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'}) : '';
+    const onclick = clickable ? `onclick="openPOReceiveForm('${p.id}','${(p.po_no||'').replace(/'/g,"\\'")}','${(p.supplier_name||'').replace(/'/g,"\\'")}','${p.status||''}')"` : '';
+    return `<div ${onclick}
+      style="background:var(--card);border:1px solid var(--border);border-left:3px solid ${sCol};border-radius:12px;padding:.85rem 1rem;margin-bottom:.6rem;${clickable?'cursor:pointer;':'opacity:.7;'}display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:.88rem;font-weight:700">${p.po_no}</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:.1rem">${p.supplier_name||'—'} · ${date}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem">
+        <span style="font-size:.65rem;font-weight:700;color:${sCol};background:${sCol}22;padding:.15rem .45rem;border-radius:20px">${sLbl}</span>
+        ${clickable?'<span style="font-size:.7rem;color:var(--orange)">▶</span>':''}
+      </div>
+    </div>`;
+  }
+
+  let html = '';
+
+  if (pendingPOs.length === 0) {
+    html += `<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.8rem">${_lang==='bm'?'Tiada PO yang menunggu penerimaan.':'No pending POs.'}</div>`;
+  } else {
+    html += `<div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.55rem">${_lang==='bm'?'Menunggu Penerimaan':'Pending'}</div>`;
+    html += pendingPOs.map(p => renderPOCard(p, true)).join('');
+  }
+
+  html += manualBtn;
+
+  if (receivedPOs.length > 0) {
+    html += `<div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:1.25rem;margin-bottom:.55rem">${_lang==='bm'?'Sudah Diterima':'Received'}</div>`;
+    html += receivedPOs.map(p => renderPOCard(p, true)).join('');
+  }
+
+  el.innerHTML = html;
+}
+
+async function loadReceiveHistory() {
+  const el = document.getElementById('recv-history');
+  if (!el) return;
+  const { data: movs } = await sb.from('raw_material_movements')
+    .select('*, material:material_id(name, unit)')
+    .eq('type', 'in')
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (!movs || !movs.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">' + (_lang === 'bm' ? 'Tiada rekod penerimaan.' : 'No receive records yet.') + '</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="section-label">' + (_lang === 'bm' ? 'Rekod terkini' : 'Recent receives') + '</div>'
+    + movs.map(m => {
+      const d = new Date(m.created_at).toLocaleDateString('en-MY', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+      return `<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:10px;padding:.7rem .9rem;margin-bottom:.5rem">
+        <div style="font-size:.85rem;font-weight:700">${m.material?.name || '—'}</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem">+${m.qty} ${m.material?.unit || ''} &nbsp;·&nbsp; ${m.reference || '—'} &nbsp;·&nbsp; ${d}</div>
+      </div>`;
+    }).join('');
+}
+
+function openReceiveForm() {
+  const matOpts = _recvMats.map(m =>
+    `<option value="${m.id}" data-unit="${m.unit}" data-stock="${m.current_stock}" data-fabric="${m.is_fabric_roll}">${m.name} (${m.unit})</option>`
+  ).join('');
+
+  const INP = 'width:100%;padding:.6rem .75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;outline:none;margin-top:.3rem';
+
+  openModal(`
+    <div class="modal-title">📦 ${_lang === 'bm' ? 'Terima Bahan' : 'Receive Material'}</div>
+
+    <datalist id="recv-mat-list">
+      ${_recvMats.map(m => `<option value="${m.name}" data-id="${m.id}" data-unit="${m.unit}" data-stock="${m.current_stock}" data-fabric="${m.is_fabric_roll}">`).join('')}
+    </datalist>
+
+    <div class="recv-item" style="margin-bottom:.65rem">
+      <div class="recv-item-name">${_lang === 'bm' ? 'Bahan *' : 'Material *'}</div>
+      <input id="recv-mat-text" list="recv-mat-list" autocomplete="off"
+        style="${INP}" placeholder="${_lang === 'bm' ? 'Taip nama bahan...' : 'Type material name...'}"
+        oninput="onRecvMatChange()">
+      <div style="display:flex;gap:.45rem;margin-top:.5rem">
+        <button type="button" id="pill-normal" onclick="setFabricPill(false)"
+          style="flex:1;padding:.38rem .5rem;border-radius:20px;border:1.5px solid var(--orange);background:var(--orange);color:#fff;font-size:.73rem;font-weight:700;cursor:pointer;transition:.15s">
+          📦 ${_lang === 'bm' ? 'Bahan Biasa' : 'Normal'}
+        </button>
+        <button type="button" id="pill-fabric" onclick="setFabricPill(true)"
+          style="flex:1;padding:.38rem .5rem;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-size:.73rem;font-weight:700;cursor:pointer;transition:.15s">
+          🧵 Fabric Roll
+        </button>
+      </div>
+      <div id="recv-stock-info" style="font-size:.68rem;color:var(--muted);margin-top:.35rem"></div>
+    </div>
+    <input type="hidden" id="recv-is-fabric" value="0">
+
+    <div class="recv-item" style="margin-bottom:.65rem">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div class="recv-item-name">${_lang === 'bm' ? 'Kuantiti Diterima *' : 'Qty Received *'}</div>
+        <span id="recv-unit" style="font-size:.72rem;color:var(--orange);font-weight:700"></span>
+      </div>
+      <input class="recv-input" id="recv-qty" type="number" step="any" min="0" placeholder="0" style="width:100%;margin-top:.3rem">
+    </div>
+
+    <div id="recv-fabric-fields" style="display:none">
+      <div style="background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25);border-radius:10px;padding:.85rem;margin-bottom:.65rem">
+        <div style="font-size:.8rem;font-weight:700;color:var(--orange);margin-bottom:.6rem">🧵 ${_lang === 'bm' ? 'Maklumat Fabric Roll' : 'Fabric Roll Details'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);margin-bottom:.2rem">${_lang === 'bm' ? 'Bil. Roll' : 'No. of Rolls'}</div>
+            <input class="recv-input" id="recv-rolls" type="number" min="1" value="1" style="width:100%">
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);margin-bottom:.2rem">${_lang === 'bm' ? 'Panjang/Roll (m)' : 'Length/Roll (m)'}</div>
+            <input class="recv-input" id="recv-len" type="number" step="any" min="0" placeholder="50" style="width:100%">
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);margin-bottom:.2rem">GSM</div>
+            <input class="recv-input" id="recv-gsm" type="text" placeholder="180gsm" style="width:100%">
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);margin-bottom:.2rem">${_lang === 'bm' ? 'Jenis / Warna' : 'Type / Colour'}</div>
+            <input class="recv-input" id="recv-type" type="text" placeholder="${_lang === 'bm' ? 'Chiffon Biru' : 'Blue Chiffon'}" style="width:100%">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-err" id="recv-err"></div>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeModal()">${t('batal')}</button>
+      <button class="btn-confirm" id="recv-btn" onclick="confirmReceive()">✅ ${t('sahkan')}</button>
+    </div>
+  `);
+}
+
+async function onRecvPOChange() {
+  const poId = document.getElementById('recv-po').value;
+  const el   = document.getElementById('po-items-preview');
+  if (!el) return;
+
+  if (!poId) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+  el.style.display = 'block';
+  el.innerHTML = '<div style="font-size:.7rem;color:var(--muted);padding:.4rem 0">⏳ Memuatkan...</div>';
+
+  const { data: items } = await sb.from('raw_material_po_items')
+    .select('*, material:material_id(name, unit)')
+    .eq('po_id', poId);
+
+  if (!items || !items.length) {
+    el.innerHTML = '<div style="font-size:.72rem;color:var(--muted);padding:.4rem 0">Tiada item dalam PO ini.</div>';
+    return;
+  }
+
+  const lbl = _lang === 'bm' ? 'Item dalam PO' : 'Items in PO';
+  const tapLbl = _lang === 'bm' ? 'Tap untuk isi' : 'Tap to fill';
+
+  el.innerHTML = '<div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem">' + lbl + '</div>'
+    + items.map(function(it) {
+      const name  = it.material?.name || '—';
+      const unit  = it.material?.unit || '';
+      const ord   = it.qty_ordered   || 0;
+      const recv  = it.qty_received  || 0;
+      const rem   = Math.max(0, ord - recv);
+      const pct   = ord ? Math.min(100, Math.round(recv / ord * 100)) : 0;
+      const done  = rem <= 0;
+      return '<div onclick="' + (done ? '' : 'fillFromPOItem(\'' + name.replace(/'/g,"\\'")+'\','+rem+',\''+unit+'\')') + '" '
+        + 'style="display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;margin-bottom:.3rem;cursor:' + (done ? 'default' : 'pointer') + ';opacity:' + (done ? '.5' : '1') + '">'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + name + '</div>'
+        + '<div style="display:flex;align-items:center;gap:.5rem;margin-top:.25rem">'
+        + '<div style="flex:1;background:var(--border);border-radius:3px;height:4px"><div style="width:' + pct + '%;height:4px;border-radius:3px;background:' + (done ? 'var(--green)' : 'var(--orange)') + '"></div></div>'
+        + '<span style="font-size:.65rem;color:var(--muted);white-space:nowrap">' + recv + '/' + ord + ' ' + unit + '</span>'
+        + '</div></div>'
+        + (done
+          ? '<span style="font-size:.65rem;color:var(--green);margin-left:.5rem">✅</span>'
+          : '<span style="font-size:.62rem;color:var(--orange);margin-left:.5rem;white-space:nowrap">' + tapLbl + '</span>')
+        + '</div>';
+    }).join('');
+}
+
+function fillFromPOItem(name, rem, unit) {
+  // Fill material name + qty
+  const matInp = document.getElementById('recv-mat-text');
+  const qtyInp = document.getElementById('recv-qty');
+  const unitEl = document.getElementById('recv-unit');
+  if (matInp) { matInp.value = name; onRecvMatChange(); }
+  if (qtyInp) qtyInp.value = rem;
+  if (unitEl && unit) unitEl.textContent = unit;
+}
+
+/* ─── PO RECEIVE FLOW ───────────────────────── */
+async function openPOReceiveForm(poId, poNo, supplier, status) {
+  // Read-only view for already-received POs
+  if (status === 'Received') {
+    openModal(`
+      <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:.75rem;color:var(--muted)">${_lang==='bm'?'No PO':'PO No'}</div>
+          <div style="font-size:.95rem;font-weight:800;color:var(--orange)">${poNo}</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem">${supplier}</div>
+        </div>
+        <span style="font-size:.72rem;font-weight:700;color:var(--green);background:rgba(16,185,129,.15);padding:.25rem .65rem;border-radius:20px">✅ Received</span>
+      </div>
+      <div id="po-recv-items"><div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.8rem">⏳ Memuatkan...</div></div>
+      <div class="btn-row">
+        <button class="btn-cancel" onclick="closeModal()">${_lang==='bm'?'Tutup':'Close'}</button>
+      </div>`);
+
+    const { data: po } = await sb.from('raw_material_po').select('*').eq('id', poId).single();
+    const el = document.getElementById('po-recv-items');
+    if (!po || !el) return;
+
+    const details = po.details ? (typeof po.details === 'string' ? JSON.parse(po.details) : po.details) : [];
+
+    // Fetch movements for this PO
+    const { data: moves } = await sb.from('raw_material_movements').select('qty,reference').order('created_at',{ascending:false}).limit(500);
+    const latestByRef = {};
+    (moves||[]).forEach(function(mv){
+      const ref = (mv.reference||'').trim();
+      if (!ref.includes(poNo)) return;
+      if (!latestByRef[ref]) latestByRef[ref] = mv;
+    });
+    const recvMap = {};
+    Object.values(latestByRef).forEach(function(mv){
+      const rest    = (mv.reference||'').slice((mv.reference||'').indexOf(poNo)+poNo.length).replace(/^[^a-zA-Z0-9\-]+/,'').trim();
+      const segment = rest.split(/\s*·\s*/)[0].trim();
+      let key;
+      if (segment.includes('/')) { const s=segment.indexOf('/'); key=(segment.slice(0,s)+'||'+segment.slice(s+1)).trim(); }
+      else { key = segment; }
+      if (key) recvMap[key] = (recvMap[key]||0) + (mv.qty||0);
+    });
+
+    if (!details.length && !Object.keys(latestByRef).length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:.8rem">Tiada details.</div>'; return;
+    }
+
+    // Build roll list — prefer movements, fallback to JSONB details
+    let rolls = Object.values(latestByRef).map(function(mv) {
+      const ref     = (mv.reference||'').trim();
+      const rest    = ref.slice(ref.indexOf(poNo)+poNo.length).replace(/^[^a-zA-Z0-9\-]+/,'').trim();
+      const parts   = rest.split(/\s*·\s*/);
+      const segment = parts[0]||'';
+      let gsm='', code='';
+      if (segment.includes('/')) { const s=segment.indexOf('/'); gsm=segment.slice(0,s).trim(); code=segment.slice(s+1).trim(); }
+      else { code=segment; }
+      const rollLabel = parts[1]||'';
+      return { ref, gsm, code, meter: mv.qty||0, rollLabel, fromMovement: true };
+    }).sort(function(a,b){ return a.ref.localeCompare(b.ref); });
+
+    // Fallback: no movements — build from JSONB details (one roll per detail row)
+    if (!rolls.length && details.length) {
+      const codeIdx2 = {};
+      rolls = details.map(function(d) {
+        const ck = (d.code||'') + '||' + (d.gsm||po.gsm||'');
+        codeIdx2[ck] = (codeIdx2[ck]||0) + 1;
+        return { gsm: d.gsm||po.gsm||'', code: d.code||'', meter: d.meter||0, rollLabel: 'Roll ' + codeIdx2[ck], fromMovement: false };
+      });
+    }
+
+    const skuPrefill = (po.sku_prefix || '').trim();
+    const poIdEsc    = poId.replace(/'/g,"\\'");
+    el.innerHTML = `<div style="margin-bottom:.75rem">
+        <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">SKU Prefix</div>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input id="reprint-sku" type="text" placeholder="Cth: PTX" value="${skuPrefill}"
+            style="flex:1;padding:.55rem .75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;font-weight:700;outline:none;text-transform:uppercase">
+          <button onclick="saveReprintSku('${poIdEsc}')"
+            style="padding:.55rem .8rem;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap">💾 Simpan</button>
+        </div>
+        <div id="reprint-sku-msg" style="font-size:.65rem;color:var(--green);margin-top:.25rem;display:none">✅ SKU disimpan</div>
+      </div>`
+      + (!rolls.length
+        ? '<div style="text-align:center;color:var(--muted);font-size:.78rem;padding:.75rem">Tiada data untuk PO ini.</div>'
+        : (rolls[0].fromMovement ? '' : '<div style="font-size:.65rem;color:var(--muted);text-align:center;margin-bottom:.5rem">⚠️ Tiada rekod movement — meter berdasarkan PO asal</div>')
+          + (function(){
+              // Pre-count rolls per code+gsm for within-PO X/Y
+              const codeTotals = {}, codeIdx3 = {};
+              rolls.forEach(function(r){ const ck=r.code+'||'+r.gsm; codeTotals[ck]=(codeTotals[ck]||0)+1; });
+              return rolls.map(function(r){
+                const ck       = r.code + '||' + r.gsm;
+                codeIdx3[ck]   = (codeIdx3[ck]||0) + 1;
+                const wNum     = codeIdx3[ck];
+                const wTot     = codeTotals[ck];
+                const codeEsc  = r.code.replace(/'/g,"\\'");
+                const gsmEsc   = r.gsm.replace(/'/g,"\\'");
+                return `<div style="display:flex;align-items:center;gap:.5rem;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;margin-bottom:.35rem">
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:.82rem;font-weight:700;color:var(--orange)">${r.code} <span style="font-size:.65rem;font-weight:500;color:var(--muted)">${r.rollLabel}</span></div>
+                    ${r.gsm?'<div style="font-size:.62rem;color:var(--muted)">'+r.gsm+'</div>':''}
+                  </div>
+                  <div style="font-size:.85rem;font-weight:700;white-space:nowrap">${Math.round(r.meter*10)/10} m</div>
+                  <button onclick="reprPrintRoll('${codeEsc}','${gsmEsc}','${r.rollLabel}',${r.meter},'${poNo}',${wNum},${wTot})"
+                    style="padding:.38rem .65rem;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;white-space:nowrap">
+                    🖨 Reprint
+                  </button>
+                </div>`;
+              }).join('');
+            })());
+    return;
+  }
+
+  const INP = 'width:100%;padding:.55rem .7rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;outline:none;text-align:right';
+
+  openModal(`
+    <button onclick="closeModal()" style="display:flex;align-items:center;gap:.35rem;background:none;border:none;color:var(--muted);font-size:.8rem;cursor:pointer;padding:.1rem 0;margin-bottom:.75rem">
+      ← ${_lang==='bm'?'Balik':'Back'}
+    </button>
+    <div style="background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem">
+      <div style="font-size:.75rem;color:var(--muted)">${_lang==='bm'?'No PO':'PO No'}</div>
+      <div style="font-size:.95rem;font-weight:800;color:var(--orange)">${poNo}</div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem">${supplier}</div>
+    </div>
+    <div id="po-recv-items"><div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.8rem">⏳ Memuatkan...</div></div>
+    <div class="form-err" id="po-recv-err"></div>
+    <div class="btn-row">
+      <button class="btn-confirm" id="po-recv-btn" onclick="confirmPOReceive('${poId}','${poNo}')">Sahkan Terima PO</button>
+    </div>
+  `);
+
+  // Fetch full PO to check rm_type + details
+  const { data: po } = await sb.from('raw_material_po').select('*').eq('id', poId).single();
+  const el = document.getElementById('po-recv-items');
+  if (!el || !po) return;
+
+  // ── FABRIC ROLL PO ──────────────────────────────
+  if (po.rm_type === 'Fabric Roll') {
+    const details = po.details
+      ? (typeof po.details === 'string' ? JSON.parse(po.details) : po.details)
+      : [];
+
+    // Collect unique GSM + fabric combos from details for filter tabs
+    const gsmFabSet = [];
+    details.forEach(function(d) {
+      const key = (d.gsm||'') + '||' + (d.fabric_name||'');
+      if (!gsmFabSet.find(function(x){ return x.key===key; }))
+        gsmFabSet.push({ key, gsm: d.gsm||po.gsm||'', fab: d.fabric_name||po.fabric_name||'' });
+    });
+    // Active filter key — default: first group
+    window._frActiveGroup = gsmFabSet.length ? gsmFabSet[0].key : '';
+    const gsmPills = gsmFabSet.length <= 1 ? '' : gsmFabSet.map(function(g) {
+      const label = (g.fab || g.gsm) + (g.fab && g.gsm ? ' (' + g.gsm + ')' : '');
+      const active = g.key === window._frActiveGroup;
+      return `<button onclick="frFilterGroup('${g.key.replace(/'/g,"\\'")}',this)"
+        style="padding:.2rem .65rem;border-radius:20px;font-size:.7rem;font-weight:700;cursor:pointer;border:1.5px solid var(--orange);
+          background:${active?'var(--orange)':'transparent'};color:${active?'#fff':'var(--orange)'};transition:.2s"
+        data-groupkey="${g.key.replace(/"/g,'&quot;')}">
+        ${label}
+      </button>`;
+    }).join('');
+
+    // Track per-roll state: _frRollData["codeIdx_rollIdx"] = {code, gsm, meter, printed}
+    window._frRollData   = {};
+    window._frDetails    = details;   // store for dynamic code tab re-render
+    window._frGsmFabSet  = gsmFabSet;
+
+    // Fetch cumulative roll counts from past movements (for overall Roll N across all POs)
+    window._frCumulativeBase = {};
+    try {
+      const { data: prevMoves } = await sb.from('raw_material_movements').select('reference,type').eq('type','in');
+      (prevMoves || []).forEach(function(m) {
+        if (!m.reference) return;
+        const match = m.reference.match(/gsm-([\d.]+)\/([\w]+)/i);
+        if (match) {
+          const key = match[2].toUpperCase() + '||' + match[1]; // e.g. "D24||173"
+          window._frCumulativeBase[key] = (window._frCumulativeBase[key]||0) + 1;
+        }
+      });
+    } catch(e) { console.warn('cumulative fetch err', e); }
+
+    el.innerHTML = `
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem">
+        <span style="background:rgba(99,102,241,.15);color:#818cf8;border-radius:6px;padding:.1rem .45rem;font-size:.68rem;font-weight:700">🧵 Fabric Roll</span>
+        ${gsmPills}
+      </div>
+      <div style="margin-bottom:.85rem">
+        <div style="font-size:.72rem;font-weight:700;color:var(--text);margin-bottom:.3rem">SKU Name <span style="color:var(--red)">*</span></div>
+        <div style="display:flex;gap:.5rem">
+          <input id="fr-sku-name" type="text" placeholder="Cth: PTX3" value="${(po.sku_prefix||'').trim()}"
+            style="flex:1;padding:.65rem .8rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;font-weight:700;outline:none">
+          <button id="fr-sku-lock-btn" onclick="frLockSku()"
+            style="padding:.65rem .9rem;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap">
+            🔒 Kunci
+          </button>
+        </div>
+        <div id="fr-sku-status" style="font-size:.68rem;color:var(--muted);margin-top:.3rem"></div>
+      </div>
+      <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">
+        ${_lang==='bm'?'Masukkan Bil. Roll & Print Stiker':'Enter Rolls & Print Stickers'}
+      </div>
+      <div id="fr-code-filter" style="margin-bottom:.65rem"></div>`
+      + (details.length === 0
+        ? '<div style="text-align:center;padding:1rem;color:var(--muted);font-size:.8rem">Tiada details dalam PO ini.</div>'
+        : (function() {
+            // Pre-count roll numbers per code+gsm for "Roll X/Y" label
+            const codeCount = {}, codeIdx = {};
+            details.forEach(function(d) {
+              const k = (d.code||'') + '||' + (d.gsm||po.gsm||'');
+              codeCount[k] = (codeCount[k]||0) + 1; codeIdx[k] = 0;
+            });
+
+            return details.map(function(d, i) {
+              const ck        = (d.code||'') + '||' + (d.gsm||po.gsm||'');
+              codeIdx[ck]++;
+              const rollNum   = codeIdx[ck];
+              const rollTotal = codeCount[ck];
+              const dGsm      = d.gsm || po.gsm || '';
+              const dFab      = d.fabric_name || po.fabric_name || '';
+              const codeEsc   = (d.code||'').replace(/'/g,"\\'");
+              const fabEsc    = dFab.replace(/'/g,"\\'");
+              const supEsc    = (po.supplier_name||'').replace(/'/g,"\\'");
+              const groupKey  = dGsm + '||' + dFab;
+              const hidden    = gsmFabSet.length > 1 && groupKey !== window._frActiveGroup;
+
+              // Register this roll in _frRollData immediately
+              window._frPoId = poId;
+              window._frRollData[i + '_0'] = { code: d.code||'', gsm: dGsm, meter: d.meter||0, printed: false, rollNum: rollNum, rollTotal: rollTotal };
+
+              return `<div id="fr-card-${i}" data-code="${d.code}" data-meter="${d.meter||0}"
+                data-pono="${poNo}" data-pogsm="${dGsm}" data-fabname="${dFab}" data-supplier="${po.supplier_name||''}"
+                data-groupkey="${groupKey.replace(/"/g,'&quot;')}"
+                style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.75rem .9rem;margin-bottom:.5rem;display:${hidden?'none':'block'}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.6rem">
+                  <div>
+                    <div style="font-size:.9rem;font-weight:800;color:var(--orange)">${d.code||'—'} <span style="font-size:.65rem;font-weight:600;color:var(--muted)">Roll ${rollNum}/${rollTotal}</span></div>
+                    <div style="font-size:.62rem;color:var(--muted);margin-top:.1rem">${dGsm}${dFab?' · '+dFab:''}</div>
+                  </div>
+                  <div style="font-size:.65rem;color:var(--muted)">PO: ${d.meter||0} m &nbsp;<span id="fr-diff-${i}" style="font-weight:700"></span></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:.5rem">
+                  <div style="font-size:.7rem;color:var(--muted);white-space:nowrap">Actual (m):</div>
+                  <input id="fr-roll-meter-${i}-0" type="number" step="any" min="0" value="${d.meter||''}"
+                    style="flex:1;padding:.45rem .7rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.95rem;font-weight:700;outline:none"
+                    oninput="frResetRoll(${i},0);frShowDiff(${i},${d.meter||0})">
+                  <button id="fr-roll-btn-${i}-0" disabled
+                    onclick="frPrintRoll(${i},0,'${codeEsc}','${poNo}','${dGsm}','${fabEsc}','${supEsc}')"
+                    style="padding:.45rem .8rem;background:var(--muted);color:#fff;border:none;border-radius:8px;font-size:.85rem;font-weight:700;cursor:not-allowed;opacity:.35;white-space:nowrap">
+                    Print
+                  </button>
+                  <span id="fr-roll-stat-${i}-0" style="font-size:.8rem;min-width:18px"></span>
+                </div>
+              </div>`;
+            }).join('');
+          })()
+      );
+
+    // Store flag for confirmPOReceive
+    el.dataset.isFabric = 'true';
+
+    // Restore state from localStorage
+    const savedState = _frLoadState(poId);
+    if (savedState) {
+      // Restore SKU immediately (before timeout so it shows right away)
+      const rolls = savedState.rolls || savedState; // handle old format
+      if (savedState.sku !== undefined) {
+        const skuInp    = document.getElementById('fr-sku-name');
+        const skuLockBtn = document.getElementById('fr-sku-lock-btn');
+        const skuStatus  = document.getElementById('fr-sku-status');
+        if (skuInp && savedState.sku) {
+          skuInp.value = savedState.sku;
+          if (savedState.skuLocked) {
+            skuInp.disabled = true;
+            skuInp.style.opacity = '0.6';
+            if (skuLockBtn) {
+              skuLockBtn.textContent = '✏️ Edit';
+              skuLockBtn.style.background = 'var(--muted)';
+              skuLockBtn.onclick = frUnlockSku;
+            }
+            if (skuStatus) skuStatus.textContent = '🔒 SKU dikunci. Tekan Edit untuk ubah.';
+          }
+        }
+      }
+      setTimeout(function() {
+        const rolls2 = savedState.rolls || savedState;
+        // Enable print buttons if SKU was locked
+        if (savedState.skuLocked) _frSetPrintButtons(true);
+        Object.keys(rolls2).forEach(function(key) {
+          const s     = rolls2[key];
+          const parts = key.split('_');
+          const ci    = parts[0], ri = parts[1];
+          // Restore meter value
+          const inp = document.getElementById('fr-roll-meter-' + ci + '-' + ri);
+          if (inp && s.meter) { inp.value = s.meter; frShowDiff(parseInt(ci), window._frRollData[key]?.meter || 0); }
+          // Restore printed/unprinted button colour
+          const btn = document.getElementById('fr-roll-btn-' + ci + '-' + ri);
+          if (btn) {
+            if (s.printed && window._frRollData[key]) {
+              window._frRollData[key].printed = true;
+              btn.disabled = false;
+              btn.style.opacity = '1';
+              btn.style.cursor = 'pointer';
+              btn.style.background = 'var(--green)';
+            } else if (savedState.skuLocked) {
+              btn.style.background = 'var(--orange)';
+            }
+          }
+        });
+        _frUpdateTabColors();
+        frCheckAllPrinted();
+      }, 100);
+    }
+
+    // Render code tabs and apply initial filters
+    setTimeout(function() { _frRenderCodeTabs(); _frApplyFilters(); }, 30);
+
+    // Disable confirm until all printed
+    const _initBtn = document.getElementById('po-recv-btn');
+    if (_initBtn) {
+      _initBtn.disabled = true;
+      _initBtn.textContent = '✅ Sahkan Terima PO';
+      _initBtn.style.cssText = 'flex:1;padding:.7rem;border:none;border-radius:10px;font-size:.9rem;font-weight:800;cursor:not-allowed;background:var(--green);color:#fff;opacity:0.25;transition:.3s';
+    }
+    return;
+  }
+
+  // ── REGULAR PO (Packaging / Trims / etc) ────────
+  const { data: items } = await sb.from('raw_material_po_items')
+    .select('id, qty_ordered, qty_received, material:material_id(id, name, unit, current_stock)')
+    .eq('po_id', poId);
+
+  if (!items || !items.length) {
+    el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.8rem">' + (_lang==='bm'?'Tiada item dalam PO ini.':'No items in this PO.') + '</div>';
+    return;
+  }
+
+  el.innerHTML = '<div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">'
+    + (_lang==='bm'?'Item PO — Masukkan Kuantiti Diterima':'PO Items — Enter Qty Received') + '</div>'
+    + items.map(function(it) {
+      const mat  = it.material || {};
+      const ord  = it.qty_ordered  || 0;
+      const recv = it.qty_received || 0;
+      const rem  = Math.max(0, ord - recv);
+      const pct  = ord ? Math.min(100, Math.round(recv/ord*100)) : 0;
+      const done = rem <= 0;
+      return `<div data-item-id="${it.id}" data-mat-id="${mat.id||''}" data-mat-name="${mat.name||'—'}" data-unit="${mat.unit||''}" data-stock="${mat.current_stock||0}"
+        style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.75rem .9rem;margin-bottom:.55rem;opacity:${done?'.45':'1'}">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem">
+          <div style="font-size:.85rem;font-weight:700">${mat.name||'—'}</div>
+          <div style="font-size:.65rem;color:var(--muted)">${recv}/${ord} ${mat.unit||''}</div>
+        </div>
+        <div style="background:var(--border);border-radius:3px;height:4px;margin-bottom:.5rem">
+          <div style="width:${pct}%;height:4px;border-radius:3px;background:${done?'var(--green)':'var(--orange)'}"></div>
+        </div>
+        ${done
+          ? '<div style="font-size:.7rem;color:var(--green);text-align:center">✅ Sudah lengkap</div>'
+          : `<div style="display:flex;align-items:center;gap:.5rem">
+              <div style="font-size:.68rem;color:var(--muted);white-space:nowrap">${_lang==='bm'?'Terima':'Receive'} (${mat.unit||''})</div>
+              <input id="po-recv-qty-${it.id}" type="number" step="any" min="0" max="${rem}" value="${rem}" style="${INP}">
+            </div>`
+        }
+      </div>`;
+    }).join('');
+}
+
+async function confirmPOReceive(poId, poNo) {
+  const errEl = document.getElementById('po-recv-err');
+  errEl.style.display = 'none';
+  const btn = document.getElementById('po-recv-btn');
+  btn.disabled = true; btn.textContent = t('saving');
+  const staff = _user?.full_name || _user?.username || 'Staff';
+
+  try {
+    const el = document.getElementById('po-recv-items');
+
+    // ── FABRIC ROLL CONFIRM ──────────────────────
+    if (el.dataset.isFabric === 'true') {
+      const data = window._frRollData || {};
+      const rollKeys = Object.keys(data);
+
+      if (!rollKeys.length) {
+        errEl.textContent = _lang==='bm'?'Tiada roll dimasukkan. Sila Set roll dulu.':'No rolls entered. Please Set rolls first.';
+        errEl.style.display = 'block';
+        btn.disabled = false; btn.textContent = '✅ Sahkan Terima PO';
+        return;
+      }
+
+      // Find fabric material
+      const { data: fabMats } = await sb.from('raw_materials').select('id, name, current_stock').eq('is_fabric_roll', true).limit(1);
+      const fabMat = fabMats?.[0] || null;
+
+      // Dedup protection — abort if movements already exist for this PO
+      const { data: existingMoves } = await sb.from('raw_material_movements').select('id').limit(1)
+        .like('reference', poNo + ' ·%');
+      if (existingMoves && existingMoves.length > 0) {
+        await sb.from('raw_material_po').update({ status: 'Received' }).eq('id', poId);
+        _frClearState(poId);
+        closeModal(); toast('✅ ' + (_lang==='bm'?'PO dah diterima sebelum ini.':'PO already received.')); loadPOList(); return;
+      }
+
+      // Create one movement per roll — reference: "PO-XXXXXX · CODE · Roll N"
+      let totalQty = 0;
+      const moves = rollKeys.map(function(key) {
+        const parts  = key.split('_');
+        const ci     = parts[0], ri = parseInt(parts[1]);
+        const meter  = parseFloat(document.getElementById('fr-roll-meter-' + ci + '-' + ri)?.value) || data[key].meter || 0;
+        totalQty += meter;
+        return {
+          material_id: fabMat?.id || null,
+          type: 'in',
+          qty: meter,
+          reference: poNo + ' · ' + (data[key].gsm||'') + '/' + data[key].code + ' · Roll ' + (data[key].rollNum || (ri + 1)),
+          created_by: staff
+        };
+      });
+
+      await sb.from('raw_material_movements').insert(moves);
+      // Update cumulative base in memory so next PO opened in same session gets correct overall roll number
+      if (!window._frCumulativeBase) window._frCumulativeBase = {};
+      moves.forEach(function(mv) {
+        if (!mv.reference) return;
+        const cumulMatch = mv.reference.match(/gsm-([\d.]+)\/([\w]+)/i);
+        if (cumulMatch) {
+          const cumulKey = cumulMatch[2].toUpperCase() + '||' + cumulMatch[1];
+          window._frCumulativeBase[cumulKey] = (window._frCumulativeBase[cumulKey] || 0) + 1;
+        }
+      });
+      if (fabMat) {
+        await sb.from('raw_materials').update({ current_stock: (fabMat.current_stock || 0) + totalQty }).eq('id', fabMat.id);
+      }
+
+      // Mark PO received
+      await sb.from('raw_material_po').update({ status: 'Received' }).eq('id', poId);
+
+      _frClearState(poId);
+      closeModal();
+      toast('✅ ' + (_lang==='bm'?'PO diterima!':'PO received!'));
+      loadPOList();
+      return;
+    }
+
+    // ── REGULAR PO CONFIRM ───────────────────────
+    const rows2 = el.querySelectorAll('[data-item-id]');
+    let anyReceived = false;
+
+    for (const row of rows2) {
+      const itemId = row.dataset.itemId;
+      const matId  = row.dataset.matId;
+      const stock  = parseFloat(row.dataset.stock) || 0;
+      const unit   = row.dataset.unit;
+      const inp    = document.getElementById('po-recv-qty-' + itemId);
+      if (!inp) continue;
+      const qty = parseFloat(inp.value) || 0;
+      if (qty <= 0) continue;
+      anyReceived = true;
+
+      await Promise.all([
+        sb.from('raw_materials').update({ current_stock: stock + qty }).eq('id', matId),
+        sb.from('raw_material_movements').insert({ material_id: matId, type: 'in', qty, reference: poNo, created_by: staff })
+      ]);
+      const { data: poItem } = await sb.from('raw_material_po_items').select('qty_received').eq('id', itemId).single();
+      const newRecv = (poItem?.qty_received || 0) + qty;
+      await sb.from('raw_material_po_items').update({ qty_received: newRecv }).eq('id', itemId);
+    }
+
+    if (!anyReceived) {
+      errEl.textContent = _lang==='bm'?'Tiada kuantiti dimasukkan.':'No quantity entered.';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = '✅ Sahkan Terima';
+      return;
+    }
+
+    const { data: allItems } = await sb.from('raw_material_po_items').select('qty_ordered, qty_received').eq('po_id', poId);
+    const allDone = (allItems||[]).every(it => (it.qty_received||0) >= it.qty_ordered);
+    await sb.from('raw_material_po').update({ status: allDone ? 'Received' : 'Partially Received' }).eq('id', poId);
+
+    closeModal();
+    toast('✅ ' + (_lang==='bm'?'Penerimaan PO berjaya!':'PO receive successful!'));
+    loadPOList();
+  } catch(err) {
+    errEl.textContent = err.message || 'Ralat berlaku.';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = '✅ Sahkan Terima';
+  }
+}
+
+/* ─── FABRIC ROLL PRINT PER CODE ────────────── */
+async function frLockSku() {
+  const input   = document.getElementById('fr-sku-name');
+  const lockBtn = document.getElementById('fr-sku-lock-btn');
+  const statusEl= document.getElementById('fr-sku-status');
+  const sku     = (input?.value || '').trim().toUpperCase();
+  if (!sku) { alert('Sila isi SKU Name dulu.'); return; }
+
+  input.value = sku;
+  input.disabled = true;
+  input.style.opacity = '0.65';
+  input.style.cursor = 'not-allowed';
+
+  lockBtn.textContent = '✏️ Edit';
+  lockBtn.style.background = 'var(--muted)';
+  lockBtn.onclick = frUnlockSku;
+
+  statusEl.textContent = '🔒 SKU dikunci. Tekan Edit untuk ubah.';
+  statusEl.style.color = 'var(--green)';
+
+  // Save SKU to DB so it persists on next open
+  if (window._frPoId) {
+    await sb.from('raw_material_po').update({ sku_prefix: sku }).eq('id', window._frPoId);
+  }
+
+  _frSetPrintButtons(true);
+  _frSaveState();
+}
+
+function frUnlockSku() {
+  const input   = document.getElementById('fr-sku-name');
+  const lockBtn = document.getElementById('fr-sku-lock-btn');
+  const statusEl= document.getElementById('fr-sku-status');
+
+  input.disabled = false;
+  input.style.opacity = '1';
+  input.style.cursor = 'text';
+  input.focus();
+
+  lockBtn.textContent = '🔒 Kunci';
+  lockBtn.style.background = 'var(--orange)';
+  lockBtn.onclick = frLockSku;
+  statusEl.textContent = '';
+
+  // Reset all roll print states
+  _frSetPrintButtons(false);
+  Object.keys(window._frRollData || {}).forEach(function(key) {
+    window._frRollData[key].printed = false;
+    const parts = key.split('_');
+    const stat = document.getElementById('fr-roll-stat-' + parts[0] + '-' + parts[1]);
+    if (stat) stat.textContent = '';
+  });
+  frCheckAllPrinted();
+}
+
+function _frSetPrintButtons(enabled) {
+  Object.keys(window._frRollData || {}).forEach(function(key) {
+    const parts = key.split('_');
+    const btn = document.getElementById('fr-roll-btn-' + parts[0] + '-' + parts[1]);
+    if (!btn) return;
+    btn.disabled = !enabled;
+    btn.style.opacity = enabled ? '1' : '0.35';
+    btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+    if (!enabled) btn.style.background = 'var(--muted)';
+  });
+}
+
+function _frSaveState() {
+  const poId = window._frPoId;
+  if (!poId) return;
+  const state = { rolls: {}, sku: '', skuLocked: false };
+  Object.keys(window._frRollData || {}).forEach(function(key) {
+    const d    = window._frRollData[key];
+    const parts = key.split('_');
+    const meter = parseFloat(document.getElementById('fr-roll-meter-' + parts[0] + '-' + parts[1])?.value) || d.meter;
+    state.rolls[key] = { printed: d.printed, meter };
+  });
+  const skuInp = document.getElementById('fr-sku-name');
+  if (skuInp) {
+    state.sku       = skuInp.value || '';
+    state.skuLocked = skuInp.disabled === true;
+  }
+  try { localStorage.setItem('fr_state_' + poId, JSON.stringify(state)); } catch(e) {}
+}
+
+function _frLoadState(poId) {
+  try { return JSON.parse(localStorage.getItem('fr_state_' + poId) || 'null'); } catch(e) { return null; }
+}
+
+function _frClearState(poId) {
+  try { localStorage.removeItem('fr_state_' + poId); } catch(e) {}
+}
+
+function frShowDiff(i, poMeter) {
+  const actual = parseFloat(document.getElementById('fr-roll-meter-' + i + '-0')?.value) || 0;
+  const el     = document.getElementById('fr-diff-' + i);
+  if (!el) return;
+  const diff = Math.round((actual - poMeter) * 10) / 10;
+  if (!actual || diff === 0) { el.textContent = ''; return; }
+  el.textContent = (diff > 0 ? '+' : '') + diff + ' m';
+  el.style.color = diff > 0 ? 'var(--green)' : 'var(--red)';
+}
+
+function frCheckSkuFilled() { /* no-op */ }
+function frResetPrint(i)    { /* no-op — use frResetRoll per roll */ }
+
+async function saveReprintSku(poId) {
+  const val = (document.getElementById('reprint-sku')?.value || '').trim().toUpperCase();
+  const { error } = await sb.from('raw_material_po').update({ sku_prefix: val || null }).eq('id', poId);
+  const msg = document.getElementById('reprint-sku-msg');
+  if (!error && msg) { msg.style.display = 'block'; setTimeout(function(){ msg.style.display = 'none'; }, 2000); }
+}
+
+async function reprPrintRoll(code, gsm, rollLabel, meter, poNo, withinNum, withinTot) {
+  const sku = (document.getElementById('reprint-sku')?.value || '').trim();
+  if (!sku) { alert('Sila isi SKU Name dulu.'); return; }
+
+  // Compute overall roll number by finding chronological position in DB
+  const gsmNum = ((gsm||'').match(/\d+/) || [''])[0];
+  // Fetch all 'in' movements for this code+gsm ordered by creation time
+  const { data: allMvs } = await sb.from('raw_material_movements')
+    .select('reference, created_at').eq('type','in').order('created_at', { ascending: true });
+  const matchingMvs = (allMvs || []).filter(function(m) {
+    if (!m.reference) return false;
+    const match = m.reference.match(/gsm-([\d.]+)\/([\w]+)/i);
+    return match && match[2].toUpperCase() === (code||'').toUpperCase() && match[1] === gsmNum;
+  });
+  // Find position of this specific PO + within roll number
+  let overallRollNum = null;
+  for (let idx = 0; idx < matchingMvs.length; idx++) {
+    const ref = matchingMvs[idx].reference || '';
+    const rollMatch = ref.match(/Roll\s+(\d+)/i);
+    const rollInRef = rollMatch ? parseInt(rollMatch[1]) : 1;
+    if (ref.includes(poNo) && rollInRef === (withinNum || 1)) {
+      overallRollNum = idx + 1;
+      break;
+    }
+  }
+  // Fallback: use position formula
+  if (!overallRollNum) overallRollNum = matchingMvs.length - (withinTot || 1) + (withinNum || 1);
+  const overallLabel = 'ROLL ' + overallRollNum;
+
+  const today      = new Date().toISOString().slice(0,10);
+  const id         = rollId(sku, today, Date.now());
+  const qrRaw      = sku + code + ' / ' + (gsm||'').toUpperCase().replace(/GSM-?/i,'GSM-') + ' / ' + overallLabel;
+  const qrDisplay  = qrRaw;
+  const qrData = encodeURIComponent(qrRaw);
+  const qrUrl  = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + qrData;
+
+  const win = window.open('', '_blank', 'width=420,height=560');
+  win.document.write(`<!DOCTYPE html><html><head><title>Reprint ${code}</title>
+    <style>
+      body{margin:0;padding:12px;font-family:-apple-system,sans-serif;text-align:center}
+      .sticker{border:2px solid #000;border-radius:8px;padding:12px;display:inline-block;min-width:220px}
+      .sku{font-size:14px;font-weight:900;margin-bottom:2px}
+      .code{font-size:22px;font-weight:900;color:#f97316;margin-bottom:2px}
+      .roll-no{font-size:16px;font-weight:800;color:#0ea5e9;margin-bottom:6px}
+      img{display:block;margin:0 auto 4px}
+      .qr-text{font-size:9px;font-family:monospace;color:#333;margin-bottom:6px;word-break:break-all}
+      .meter{font-size:22px;font-weight:800;margin-bottom:4px}
+      .info{font-size:10px;color:#444;margin-bottom:2px}
+      .sid{font-size:9px;color:#888;font-family:monospace;margin-top:4px}
+      @media print{.no-print{display:none}}
+    </style></head><body>
+    <div class="sticker">
+      <div class="sku">${sku}</div>
+      <div class="code">${code}</div>
+      <div class="roll-no">${overallLabel}</div>
+      <img src="${qrUrl}" width="180" height="180">
+      <div class="qr-text">${qrDisplay}</div>
+      <div class="meter">${Math.round(meter*10)/10} m</div>
+      <div class="info">PO: ${poNo} &nbsp;|&nbsp; ${today}</div>
+      <div class="info">GSM: ${gsm||'—'} &nbsp;|&nbsp; Roll ${withinNum||'?'}/${withinTot||'?'}</div>
+      <div class="sid">${id}</div>
+    </div>
+    <br><button class="no-print" onclick="window.print()" style="padding:8px 20px;font-size:14px;cursor:pointer;margin:8px">🖨 Print</button>
+    </body></html>`);
+  win.document.close();
+}
+
+function _frRenderCodeTabs() {
+  const el = document.getElementById('fr-code-filter');
+  if (!el) return;
+  const activeGroup = window._frActiveGroup || '';
+  const details     = window._frDetails || [];
+
+  // Get codes that belong to the active GSM group
+  const codesInGroup = [];
+  details.forEach(function(d) {
+    const key = (d.gsm||'') + '||' + (d.fabric_name||'');
+    const groupMatch = !activeGroup || key === activeGroup;
+    if (groupMatch && d.code && !codesInGroup.includes(d.code)) codesInGroup.push(d.code);
+  });
+
+  if (codesInGroup.length <= 1) { el.innerHTML = ''; window._frActiveCode = 'all'; return; }
+
+  window._frActiveCode = 'all';
+  el.innerHTML = '<div style="display:flex;gap:.4rem;flex-wrap:wrap">'
+    + '<button onclick="frFilterCode(\'all\',this)" data-codefilter="all"'
+    + ' style="padding:.25rem .7rem;border-radius:20px;font-size:.7rem;font-weight:700;cursor:pointer;border:1.5px solid var(--text);background:var(--text);color:var(--bg)">Semua</button>'
+    + codesInGroup.map(function(c) {
+        return '<button onclick="frFilterCode(\''+c+'\',this)" data-codefilter="'+c+'"'
+          + ' style="padding:.25rem .7rem;border-radius:20px;font-size:.7rem;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--muted)">'+c+'</button>';
+      }).join('')
+    + '</div>';
+}
+
+function _frApplyFilters() {
+  const activeGroup = window._frActiveGroup || '';
+  const activeCode  = window._frActiveCode  || 'all';
+  document.querySelectorAll('[data-groupkey][id^="fr-card-"]').forEach(function(card) {
+    const groupMatch = !activeGroup || card.dataset.groupkey === activeGroup;
+    const codeMatch  = activeCode === 'all' || card.dataset.code === activeCode;
+    card.style.display = (groupMatch && codeMatch) ? 'block' : 'none';
+  });
+}
+
+function frFilterGroup(groupKey, btn) {
+  window._frActiveGroup = groupKey;
+  _frRenderCodeTabs();
+  _frApplyFilters();
+  _frUpdateTabColors();
+}
+
+function frFilterCode(code, btn) {
+  window._frActiveCode = code;
+  document.querySelectorAll('[data-codefilter]').forEach(function(el) {
+    const active = el.dataset.codefilter === code;
+    el.style.background = active ? 'var(--text)' : 'transparent';
+    el.style.color = active ? 'var(--bg)' : 'var(--muted)';
+    el.style.borderColor = active ? 'var(--text)' : 'var(--border)';
+  });
+  _frApplyFilters();
+}
+
+function frResetRoll(ci, ri) {
+  const key = ci + '_' + ri;
+  if (!window._frRollData?.[key]) return;
+  window._frRollData[key].printed = false;
+  const btn  = document.getElementById('fr-roll-btn-' + ci + '-' + ri);
+  const stat = document.getElementById('fr-roll-stat-' + ci + '-' + ri);
+  if (btn)  btn.style.background = 'var(--orange)';
+  if (stat) stat.textContent = '';
+  frCheckAllPrinted();
+}
+
+function frSetRollCount(i) {
+  const card  = document.getElementById('fr-card-' + i);
+  const count = parseInt(document.getElementById('fr-rollcount-' + i)?.value) || 0;
+  if (count <= 0) { alert('Sila masukkan bil. roll.'); return; }
+
+  const code     = card?.dataset.code || '';
+  const poMeter  = parseFloat(card?.dataset.meter) || 0;
+  const poNo     = card?.dataset.pono || '';
+  const gsm      = card?.dataset.pogsm || '';
+  const fabName  = (card?.dataset.fabname || '').replace(/'/g,"\\'");
+  const supplier = (card?.dataset.supplier || '').replace(/'/g,"\\'");
+
+  // Clear old roll data for this code index
+  Object.keys(window._frRollData || {}).filter(k => k.startsWith(i + '_')).forEach(function(k) {
+    delete window._frRollData[k];
+  });
+
+  // Init new roll data
+  const skuLocked = document.getElementById('fr-sku-name')?.disabled === true;
+  for (let r = 0; r < count; r++) {
+    window._frRollData[i + '_' + r] = { code, meter: poMeter, printed: false };
+  }
+
+  // Render roll rows
+  const rowsEl = document.getElementById('fr-rollrows-' + i);
+  const codeEsc = code.replace(/'/g,"\\'");
+  rowsEl.innerHTML = Array.from({length: count}, function(_, r) {
+    return `<div id="fr-rollrow-${i}-${r}" style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
+      <span style="font-size:.68rem;font-weight:700;color:var(--muted);min-width:48px">Roll ${r+1}</span>
+      <input id="fr-roll-meter-${i}-${r}" type="number" step="any" min="0" value="${poMeter}"
+        style="flex:1;padding:.38rem .55rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;font-weight:600;outline:none"
+        oninput="frResetRoll(${i},${r})">
+      <span style="font-size:.68rem;color:var(--muted)">m</span>
+      <button id="fr-roll-btn-${i}-${r}"
+        onclick="frPrintRoll(${i},${r},'${codeEsc}','${poNo}','${gsm}','${fabName}','${supplier}')"
+        ${skuLocked ? '' : 'disabled'}
+        style="padding:.38rem .65rem;background:${skuLocked?'var(--orange)':'var(--muted)'};color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:${skuLocked?'pointer':'not-allowed'};opacity:${skuLocked?'1':'.35'}">
+        🖨
+      </button>
+      <span id="fr-roll-stat-${i}-${r}" style="font-size:.75rem;min-width:16px"></span>
+    </div>`;
+  }).join('');
+
+  frCheckAllPrinted();
+}
+
+function frCheckAllPrinted() {
+  const data = window._frRollData || {};
+  const keys = Object.keys(data);
+  const allDone = keys.length > 0 && keys.every(function(k) { return data[k].printed; });
+  const confBtn = document.getElementById('po-recv-btn');
+  if (!confBtn) return;
+  confBtn.textContent = '✅ Sahkan Terima PO';
+  if (allDone) {
+    confBtn.disabled = false;
+    confBtn.style.cssText = 'flex:1;padding:.7rem;border:none;border-radius:10px;font-size:.9rem;font-weight:800;cursor:pointer;background:var(--green);color:#fff;opacity:1;transition:.3s';
+  } else {
+    confBtn.disabled = true;
+    confBtn.style.cssText = 'flex:1;padding:.7rem;border:none;border-radius:10px;font-size:.9rem;font-weight:800;cursor:not-allowed;background:var(--green);color:#fff;opacity:0.25;transition:.3s';
+  }
+  _frUpdateTabColors();
+}
+
+function _frUpdateTabColors() {
+  const data    = window._frRollData || {};
+  const details = window._frDetails  || [];
+
+  // GSM group tabs → green if all rolls in that group printed
+  document.querySelectorAll('button[data-groupkey]').forEach(function(btn) {
+    const gk = btn.dataset.groupkey;
+    const groupKeys = Object.keys(data).filter(function(k) {
+      const ci = parseInt(k.split('_')[0]);
+      const d  = details[ci]; if (!d) return false;
+      return ((d.gsm||'') + '||' + (d.fabric_name||'')) === gk;
+    });
+    const done = groupKeys.length > 0 && groupKeys.every(function(k) { return data[k].printed; });
+    if (done) {
+      btn.style.background   = 'var(--green)';
+      btn.style.color        = '#fff';
+      btn.style.borderColor  = 'var(--green)';
+    } else {
+      const active = gk === window._frActiveGroup;
+      btn.style.background  = active ? 'var(--orange)' : 'transparent';
+      btn.style.color       = active ? '#fff' : 'var(--orange)';
+      btn.style.borderColor = 'var(--orange)';
+    }
+  });
+
+  // Code tabs → green if all rolls for that code (in active group) printed
+  const activeGroup = window._frActiveGroup || '';
+  document.querySelectorAll('button[data-codefilter]').forEach(function(btn) {
+    const code = btn.dataset.codefilter;
+    if (code === 'all') return;
+    const codeKeys = Object.keys(data).filter(function(k) {
+      const ci = parseInt(k.split('_')[0]);
+      const d  = details[ci]; if (!d) return false;
+      const gk = (d.gsm||'') + '||' + (d.fabric_name||'');
+      return d.code === code && (!activeGroup || gk === activeGroup);
+    });
+    const done = codeKeys.length > 0 && codeKeys.every(function(k) { return data[k].printed; });
+    if (done) {
+      btn.style.background  = 'var(--green)';
+      btn.style.color       = '#fff';
+      btn.style.borderColor = 'var(--green)';
+    } else {
+      const active = btn.dataset.codefilter === window._frActiveCode;
+      btn.style.background  = active ? 'var(--text)' : 'transparent';
+      btn.style.color       = active ? 'var(--bg)' : 'var(--muted)';
+      btn.style.borderColor = active ? 'var(--text)' : 'var(--border)';
+    }
+  });
+}
+
+function frPrintRoll(ci, ri, code, poNo, gsm, fabName, supplier) {
+  const sku   = (document.getElementById('fr-sku-name')?.value || '').trim();
+  const meter = parseFloat(document.getElementById('fr-roll-meter-' + ci + '-' + ri)?.value) || 0;
+  if (!sku)        { alert('Sila isi SKU Name dulu.'); return; }
+  if (meter <= 0)  { alert('Sila isi meter untuk roll ini.'); return; }
+
+  // Within-PO roll number and total (stored at render time)
+  const rollData       = (window._frRollData || {})[ci + '_0'] || {};
+  const withinRollNum  = rollData.rollNum  || 1;
+  const withinRollTot  = rollData.rollTotal || 1;
+
+  // Cumulative (overall) roll number across all POs
+  const gsmNum         = ((gsm||'').match(/\d+/) || [''])[0];
+  const cumulKey       = (code||'').toUpperCase() + '||' + gsmNum;
+  const cumulBase      = (window._frCumulativeBase || {})[cumulKey] || 0;
+  const overallRollNum = cumulBase + withinRollNum;
+
+  const today = new Date().toISOString().slice(0,10);
+  const id    = rollId(sku, today, Date.now() + ri);
+
+  // QR encodes overall roll number; display text matches QR content
+  const qrRaw     = sku + code + ' / ' + (gsm||'').toUpperCase() + ' / ROLL ' + overallRollNum;
+  const qrDisplay = qrRaw;
+  const qrData = encodeURIComponent(qrRaw);
+  const qrUrl  = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + qrData;
+
+  const stickerHtml = `<div class="sticker">
+    <div class="sku">${sku}</div>
+    <div class="code">${code}</div>
+    <div class="roll-no">Roll ${overallRollNum}</div>
+    <img src="${qrUrl}" width="180" height="180">
+    <div class="qr-text">${qrDisplay}</div>
+    <div class="meter">${meter} m</div>
+    <div class="info">PO: ${poNo} &nbsp;|&nbsp; ${today}</div>
+    <div class="info">GSM: ${gsm||'—'} &nbsp;|&nbsp; Roll ${withinRollNum}/${withinRollTot}</div>
+    <div class="sid">${id}</div>
+  </div>`;
+
+  const win = window.open('', '_blank', 'width=420,height=560');
+  win.document.write(`<!DOCTYPE html><html><head><title>Stiker ${code} Roll ${ri+1}</title>
+    <style>
+      body{margin:0;padding:12px;font-family:-apple-system,sans-serif;text-align:center}
+      .sticker{border:2px solid #000;border-radius:8px;padding:12px;display:inline-block;min-width:220px}
+      .sku{font-size:14px;font-weight:900;margin-bottom:2px}
+      .code{font-size:22px;font-weight:900;color:#f97316;margin-bottom:2px}
+      .roll-no{font-size:16px;font-weight:800;color:#0ea5e9;margin-bottom:6px}
+      img{display:block;margin:0 auto 4px}
+      .qr-text{font-size:9px;font-family:monospace;color:#333;margin-bottom:6px;word-break:break-all}
+      .meter{font-size:22px;font-weight:800;margin-bottom:4px}
+      .info{font-size:10px;color:#444;margin-bottom:2px}
+      .sid{font-size:9px;color:#888;font-family:monospace;margin-top:4px}
+      @media print{.no-print{display:none}}
+    </style></head><body>
+    ${stickerHtml}
+    <br><button class="no-print" onclick="window.print()" style="padding:8px 20px;font-size:14px;cursor:pointer;margin:8px">🖨 Print</button>
+    </body></html>`);
+  win.document.close();
+
+  // Mark this roll as printed
+  if (window._frRollData[ci + '_' + ri]) window._frRollData[ci + '_' + ri].printed = true;
+  const btn  = document.getElementById('fr-roll-btn-' + ci + '-' + ri);
+  const stat = document.getElementById('fr-roll-stat-' + ci + '-' + ri);
+  if (btn)  { btn.style.background = 'var(--green)'; }
+  if (stat) { stat.textContent = ''; }
+
+  // Persist printed state to localStorage
+  _frSaveState();
+
+  // Update card border if all rolls for this code done
+  const codeKeys  = Object.keys(window._frRollData).filter(function(k) { return k.startsWith(ci + '_'); });
+  const codeDone  = codeKeys.every(function(k) { return window._frRollData[k].printed; });
+  const card = document.getElementById('fr-card-' + ci);
+  if (card && codeDone) { card.style.borderColor = 'var(--green)'; card.style.background = 'rgba(16,185,129,.04)'; }
+
+  frCheckAllPrinted();
+}
+
+function setFabricPill(isFabric) {
+  document.getElementById('recv-is-fabric').value = isFabric ? '1' : '0';
+  const pN = document.getElementById('pill-normal');
+  const pF = document.getElementById('pill-fabric');
+  if (!pN || !pF) return;
+  pN.style.background  = isFabric ? 'transparent'   : 'var(--orange)';
+  pN.style.color       = isFabric ? 'var(--muted)'  : '#fff';
+  pN.style.borderColor = isFabric ? 'var(--border)' : 'var(--orange)';
+  pF.style.background  = isFabric ? 'var(--orange)' : 'transparent';
+  pF.style.color       = isFabric ? '#fff'           : 'var(--muted)';
+  pF.style.borderColor = isFabric ? 'var(--orange)' : 'var(--border)';
+  document.getElementById('recv-fabric-fields').style.display = isFabric ? 'block' : 'none';
+}
+
+function getRecvMatMatch() {
+  const typed = (document.getElementById('recv-mat-text')?.value || '').trim().toLowerCase();
+  return _recvMats.find(m => m.name.toLowerCase() === typed) || null;
+}
+
+function onRecvMatChange() {
+  const mat    = getRecvMatMatch();
+  const unit   = mat?.unit  || '';
+  const stock  = mat?.current_stock ?? '';
+  const fabric = mat?.is_fabric_roll === true;
+  document.getElementById('recv-unit').textContent = unit || '';
+  const info = document.getElementById('recv-stock-info');
+  info.textContent = mat ? (_lang === 'bm' ? 'Stok semasa: ' : 'Current stock: ') + stock + ' ' + unit : '';
+  // Auto-select pill based on DB flag
+  if (fabric) setFabricPill(true);
+}
+
+async function confirmReceive() {
+  const errEl  = document.getElementById('recv-err');
+  errEl.style.display = 'none';
+
+  const matName  = (document.getElementById('recv-mat-text')?.value || '').trim();
+  const mat      = getRecvMatMatch();   // null if typed name not in DB
+  const matId    = mat?.id || null;
+  const qty      = parseFloat(document.getElementById('recv-qty').value) || 0;
+  const isFabric = document.getElementById('recv-is-fabric').value === '1'
+                || mat?.is_fabric_roll === true;
+
+  if (!matName) { errEl.textContent = _lang === 'bm' ? 'Sila isi nama bahan.' : 'Please enter material name.'; errEl.style.display = 'block'; return; }
+  if (!qty || qty <= 0) { errEl.textContent = t('err_qty'); errEl.style.display = 'block'; return; }
+
+  const unit  = mat?.unit || '';
+  const stock = mat?.current_stock || 0;
+
+  const btn = document.getElementById('recv-btn');
+  btn.disabled = true; btn.textContent = t('saving');
+
+  try {
+    // Update stock + create movement (manual, no PO)
+    await Promise.all([
+      sb.from('raw_materials').update({ current_stock: stock + qty }).eq('id', matId),
+      sb.from('raw_material_movements').insert({
+        material_id: matId, type: 'in', qty,
+        reference: 'Manual receive',
+        created_by: _user?.full_name || _user?.username || 'Staff'
+      })
+    ]);
+
+    closeModal();
+    toast('✅ ' + (_lang === 'bm' ? 'Penerimaan berjaya!' : 'Receive successful!'));
+
+    // Fabric roll → open sticker
+    if (isFabric) {
+      const rolls = parseInt(document.getElementById('recv-rolls')?.value) || 1;
+      const len   = document.getElementById('recv-len')?.value || '';
+      const gsm   = document.getElementById('recv-gsm')?.value || '';
+      const type  = document.getElementById('recv-type')?.value || '';
+      _stickerCtx = { poNo: 'MANUAL', ops: [{ matName, unit, qty, isFabric: true, rolls, len, gsm, type }] };
+      openStickerSetupFromForm();
+    } else {
+      loadPOList();
+    }
+  } catch(err) {
+    errEl.textContent = err.message || 'Ralat berlaku.';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = '✅ ' + t('sahkan');
+  }
+}
+
+// Sticker setup — handles single op (manual) and multi-op (PO fabric roll)
+function openStickerSetupFromForm() {
+  document.getElementById('btn-print').style.display = 'none';
+  document.getElementById('sticker-preview').style.display = 'none';
+  document.getElementById('sticker-preview').innerHTML = '';
+
+  const { poNo, ops } = _stickerCtx;
+
+  const blocks = ops.map(function(op, i) {
+    return `<div class="sticker-mat-block" style="margin-bottom:.75rem">
+      <div class="sticker-mat-name">
+        🧵 ${op.type ? op.type + ' · ' : ''}${op.matName}
+      </div>
+      <div class="field-row">
+        <div class="field"><label>${_lang === 'bm' ? 'Bil. Roll' : 'No. of Rolls'}</label><input type="number" min="1" value="${op.rolls || 1}" id="st-rolls-${i}"></div>
+        <div class="field"><label>${_lang === 'bm' ? 'Meter/Roll' : 'Meter/Roll'} (${op.unit||'m'})</label><input type="number" step="any" value="${op.len || op.qty}" id="st-len-${i}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>GSM</label><input type="text" value="${op.gsm || ''}" placeholder="180gsm" id="st-gsm-${i}"></div>
+        <div class="field"><label>${_lang === 'bm' ? 'Jenis/Kod' : 'Type/Code'}</label><input type="text" value="${op.type || ''}" placeholder="D24" id="st-type-${i}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const html = `<p class="sticker-intro">${_lang === 'bm' ? 'Penerimaan berjaya.' : 'Receive successful.'}<br>${_lang === 'bm' ? 'Semak maklumat roll dan jana stiker QR.' : 'Verify roll details and generate QR stickers.'}</p>
+    ${blocks}
+    <button class="btn-generate" onclick="generateStickers()">🏷 ${_lang === 'bm' ? 'Jana Stiker QR' : 'Generate QR Stickers'}</button>
+    <button class="btn-skip" onclick="backToMain()">${_lang === 'bm' ? 'Langkau — Kembali' : 'Skip — Go Back'}</button>`;
+
+  document.getElementById('sticker-setup').innerHTML = html;
+  goScreen('screen-stickers');
+}
+
+/* ════════════════════════════════════════════
+   TAB 2 — PICK REQUEST
+════════════════════════════════════════════ */
+async function loadPickRequests() {
+  const el = document.getElementById('req-list');
+  el.innerHTML = '<div class="loading">' + t('loading_req') + '</div>';
+
+  const { data: reqs } = await sb.from('production_material_requests')
+    .select('*, material:material_id(id, name, unit, current_stock)')
+    .eq('status', 'Approved')
+    .order('reviewed_at', { ascending: true });
+
+  if (!reqs || !reqs.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">${t('req_empty1')}<br>${t('req_empty2')}</div></div>`;
+    return;
+  }
+
+  el.innerHTML = '<div class="section-label">' + reqs.length + t('req_label') + '</div>'
+    + reqs.map(r => {
+      const mat = r.material;
+      const isFabric = r.order_ref && r.order_ref.startsWith('FABRIC|');
+      const ref = r.order_ref ? r.order_ref.replace('FABRIC|','') : '';
+      const date = new Date(r.requested_at).toLocaleDateString('en-MY', { day:'2-digit', month:'short' });
+      let badges = '';
+      if (isFabric) {
+        const info = parseFabricInfo(r.reason || '');
+        const totalRolls = info && info._json ? info.items.reduce((s,it)=>s+(it.rolls||0),0) : (info ? info.rolls : '—');
+        const fabLabel   = info && info._json ? info.fab : (mat?.name || '—');
+        const gsmList = info && info._json
+          ? [...new Set(info.items.map(it=>it.gsm))].map(g=>`<span class="req-badge">${g}</span>`).join('')
+          : (info?.gsm ? `<span class="req-badge">${info.gsm}</span>` : '');
+        badges = `<div class="req-badges">
+          <span class="req-badge">🧵 Fabric Roll</span>
+          <span class="req-badge">${totalRolls} roll</span>
+          ${gsmList}
+        </div>`;
+      } else {
+        badges = `<div class="req-badges">
+          <span class="req-badge">📋 Material</span>
+          <span class="req-badge">Qty: ${r.qty_requested} ${mat?.unit || ''}</span>
+          ${ref ? '<span class="req-badge">Ref: ' + ref + '</span>' : ''}
+        </div>`;
+      }
+      const cardTitle = isFabric ? (parseFabricInfo(r.reason||'')?._json ? parseFabricInfo(r.reason||'').fab : (mat?.name||'—')) : (mat?.name||'—');
+      return `<div class="req-card" onclick="openPickModal('${r.id}')">
+        <div class="req-name">${cardTitle}</div>
+        <div class="req-sub">Diminta oleh: ${r.requested_by || '—'} · ${date}</div>
+        ${badges}
+        ${r.reason && !isFabric ? '<div style="font-size:.7rem;color:var(--muted);margin-top:.35rem">📝 ' + r.reason + '</div>' : ''}
+        <div style="display:flex;justify-content:flex-end;margin-top:.5rem">
+          <span style="font-size:.72rem;font-weight:700;color:var(--cyan)">${t('tap_process')}</span>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+async function openPickModal(reqId) {
+  const { data: r } = await sb.from('production_material_requests')
+    .select('*, material:material_id(id, name, unit, current_stock)')
+    .eq('id', reqId).single();
+  if (!r) return;
+
+  const mat      = r.material;
+  const isFabric = r.order_ref && r.order_ref.startsWith('FABRIC|');
+  const ref      = r.order_ref ? r.order_ref.replace('FABRIC|','') : '';
+
+  if (isFabric) {
+    openFabricPickModal(r, mat, ref);
+    return;
+  }
+
+  // ── Non-fabric (original flow) ──
+  const stockColor = (mat?.current_stock || 0) >= r.qty_requested ? 'var(--green)' : 'var(--red)';
+  openModal(`
+    <div class="modal-title">${t('modal_process')}</div>
+    <div class="modal-sub">${mat?.name || '—'} ${ref ? '· Ref: ' + ref : ''}</div>
+    <div style="background:var(--bg);border-radius:10px;padding:.75rem;margin-bottom:.75rem">
+      <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.35rem">
+        <span style="color:var(--muted)">${t('qty_diminta')}</span><strong>${r.qty_requested} ${mat?.unit||''}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.8rem">
+        <span style="color:var(--muted)">${t('stok_semasa')}</span>
+        <strong style="color:${stockColor}">${mat?.current_stock||0} ${mat?.unit||''}</strong>
+      </div>
+    </div>
+    ${r.reason ? '<div style="font-size:.75rem;color:var(--muted);margin-bottom:.75rem">📝 ' + r.reason + '</div>' : ''}
+    <div class="recv-item" style="margin-bottom:.75rem">
+      <div class="recv-item-name" style="font-size:.75rem;font-weight:600;margin-bottom:.35rem">${t('qty_issue')} (${mat?.unit||''})</div>
+      <input class="recv-input" id="pick-qty" type="number" step="any" min="0" value="${r.qty_requested}" placeholder="Qty">
+    </div>
+    <div class="recv-item" style="margin-bottom:.75rem">
+      <div class="recv-item-name" style="font-size:.75rem;font-weight:600;margin-bottom:.35rem">${t('notes_opt')}</div>
+      <input class="recv-input" id="pick-notes" type="text" placeholder="${t('notes_ph')}">
+    </div>
+    <div class="form-err" id="pick-err"></div>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeModal()">${t('batal')}</button>
+      <button class="btn-issue" id="pick-btn" onclick="confirmPick('${reqId}','${mat?.id||''}',${mat?.current_stock||0},'${mat?.unit||''}')">${t('issue_btn')}</button>
+    </div>
+  `);
+}
+
+async function openFabricPickModal(r, mat, ref) {
+  const info  = parseFabricInfo(r.reason || '');
+  const items = (info && info._json) ? info.items : [];
+  const fab   = (info && info._json) ? info.fab : (mat?.name || '—');
+
+  window._pickReqId  = r.id;
+  window._pickMatId  = mat?.id;
+  window._pickRef    = ref || '';
+  window._pickFab    = fab || '';
+  // Parse destination from reason JSON
+  try { const rj = JSON.parse(r.reason || '{}'); window._pickDestination = rj.destination || ''; } catch(e) { window._pickDestination = ''; }
+
+  // Fetch movements + PO sku_prefix map
+  const [{ data: moves }, { data: poList }] = await Promise.all([
+    sb.from('raw_material_movements').select('qty, type, reference, created_at').order('created_at', { ascending: true }).limit(3000),
+    sb.from('raw_material_po').select('po_no, sku_prefix')
+  ]);
+  const skuMap = {};
+  (poList || []).forEach(p => { if (p.po_no) skuMap[p.po_no] = (p.sku_prefix || '').trim(); });
+
+  // For each item, find remaining FIFO rolls from movements
+  function getFifoRolls(code, gsmLabel) {
+    // gsmLabel e.g. "173gsm" → match reference containing "gsm-173"
+    const gsmNum = gsmLabel.replace(/gsm$/i,'').trim(); // "173"
+    const refKey = 'gsm-' + gsmNum + '/' + code;       // "gsm-173/D24"
+    const inMoves = (moves || []).filter(m => m.type === 'in' && m.reference && m.reference.includes(refKey));
+    const outMoves = (moves || []).filter(m => m.type === 'out' && m.reference && m.reference.includes(refKey));
+    const outQty = outMoves.reduce((s, m) => s + (m.qty || 0), 0);
+    // FIFO: consume oldest in-moves first
+    let rem = outQty;
+    const remaining = [];
+    for (const mv of inMoves) {
+      const q = mv.qty || 0;
+      const consume = Math.min(q, rem);
+      rem -= consume;
+      if (q - consume > 0) {
+        // Extract roll ref from reference e.g. "PO-123456 · gsm-173/D24 · Roll 3"
+        const rollMatch = mv.reference.match(/Roll\s*(\d+)/i);
+        const poMatch   = mv.reference.match(/PO-([^\s·]+)/i);
+        const poNo      = poMatch ? 'PO-' + poMatch[1] : '?';
+        remaining.push({
+          ref: mv.reference,
+          rollNo: rollMatch ? rollMatch[1] : '?',
+          po: poNo,
+          sku: skuMap[poNo] || '',
+          meter: q - consume
+        });
+      }
+    }
+    return remaining;
+  }
+
+  // Restore existing scan progress if returning to the same request
+  const existingScan = window._pickScan;
+  const sameReq = window._pickReqId === r.id && existingScan && existingScan.length > 0
+    && existingScan.some(s => s.scanned.length > 0);
+  if (sameReq) {
+    // Reuse existing scan — just refresh fifoRolls in case stock changed
+    existingScan.forEach(s => { s.fifoRolls = getFifoRolls(s.code, s.gsm); });
+  } else {
+    window._pickScan = items.map(it => ({
+      code: it.code, gsm: it.gsm, needed: it.rolls, meter: it.meter,
+      fifoRolls: getFifoRolls(it.code, it.gsm), scanned: []
+    }));
+  }
+
+  function renderPickItems() {
+    return window._pickScan.map((s, idx) => {
+      const done = s.scanned.length >= s.needed;
+      const dots = Array.from({length: s.needed}, (_,i) =>
+        `<div style="width:9px;height:9px;border-radius:50%;background:${i < s.scanned.length ? 'var(--green)' : 'var(--border)'}"></div>`
+      ).join('');
+      const scannedList = s.scanned.map((qr, i) =>
+        `<div style="font-size:.65rem;color:var(--green);font-family:monospace;margin-top:.2rem;padding:.15rem .4rem;background:rgba(16,185,129,.08);border-radius:4px">
+          ✓ ${qr}
+        </div>`
+      ).join('');
+      return `<div id="pick-item-${idx}" style="padding:.55rem .7rem;border-radius:9px;margin-bottom:.35rem;background:${done?'rgba(16,185,129,.07)':'var(--card)'};border:1px solid ${done?'rgba(16,185,129,.3)':'var(--border)'}">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-weight:800;font-size:.88rem;color:var(--orange)">${(s.fifoRolls[0]?.sku||'')+s.code}</span>
+            <span style="font-size:.68rem;color:var(--muted)">${s.gsm}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <div style="display:flex;gap:.25rem">${dots}</div>
+            <span style="font-size:.75rem;font-weight:700;color:${done?'var(--green)':'var(--muted)'};min-width:2.5rem;text-align:right">${s.scanned.length}/${s.needed}</span>
+          </div>
+        </div>
+        ${scannedList}
+      </div>`;
+    }).join('');
+  }
+
+  const allDone = () => window._pickScan.every(s => s.scanned.length >= s.needed);
+
+  openModal(`
+    <div class="modal-title">🧵 Pick Fabric Roll</div>
+    <div class="modal-sub">${fab}${ref ? ' · Ref: ' + ref : ''}</div>
+    <div id="pick-items-wrap" style="margin:.75rem 0">${renderPickItems()}</div>
+    <div class="form-err" id="pick-err"></div>
+    <div class="btn-row" style="flex-direction:column;gap:.5rem">
+      <button onclick="startScanAll()" style="width:100%;padding:.6rem;background:var(--orange);color:#fff;border:none;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer">📷 Scan Semua Roll</button>
+      <div style="display:flex;gap:.5rem;width:100%">
+        <button class="btn-cancel" onclick="closeModal()" style="flex:1">← Kembali</button>
+        <button class="btn-issue" id="pick-confirm-btn" onclick="confirmFabricPick()" style="flex:2;${allDone()?'':'opacity:.4;cursor:not-allowed'}" ${allDone()?'':'disabled'}>✅ Confirm Pick</button>
+      </div>
+    </div>
+  `);
+
+  window._pickRenderItems = function() {
+    document.getElementById('pick-items-wrap').innerHTML = renderPickItems();
+    const btn = document.getElementById('pick-confirm-btn');
+    if (btn) { btn.disabled = !allDone(); btn.style.opacity = allDone() ? '1' : '.4'; btn.style.cursor = allDone() ? 'pointer' : 'not-allowed'; }
+  };
+}
+
+async function confirmPick(reqId, matId, currentStock, unit) {
+  const errEl = document.getElementById('pick-err');
+  errEl.style.display = 'none';
+
+  const qty   = parseFloat(document.getElementById('pick-qty').value) || 0;
+  const notes = (document.getElementById('pick-notes').value || '').trim();
+
+  if (!qty || qty <= 0) { errEl.textContent = t('err_qty'); errEl.style.display = 'block'; return; }
+  if (qty > currentStock) { errEl.textContent = t('err_stok') + currentStock + ' ' + unit; errEl.style.display = 'block'; return; }
+
+  const btn = document.getElementById('pick-btn');
+  btn.disabled = true; btn.textContent = t('saving');
+
+  try {
+    const newStock = currentStock - qty;
+    await Promise.all([
+      sb.from('production_material_requests').update({
+        status: 'Issued',
+        qty_issued: qty,
+        reviewed_by: _user?.full_name || _user?.username || 'Staff',
+        reviewed_at: new Date().toISOString(),
+        notes: notes || null
+      }).eq('id', reqId),
+      sb.from('raw_materials').update({ current_stock: newStock }).eq('id', matId),
+      sb.from('raw_material_movements').insert({
+        material_id: matId,
+        type: 'out',
+        qty: qty,
+        reference: 'Production request',
+        note: notes || null,
+        created_by: _user?.full_name || _user?.username || 'Staff'
+      })
+    ]);
+
+    closeModal();
+    toast(t('toast_issue') + qty + ' ' + unit + t('issued'));
+    loadPickRequests();
+    loadPickBadge();
+  } catch(err) {
+    errEl.textContent = err.message || 'Ralat berlaku.';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = '⚙️ Issue & Process';
+  }
+}
+
+/* ════════════════════════════════════════════
+   QR SCANNER
+════════════════════════════════════════════ */
+let _scanStream = null, _scanRAF = null, _scanItemIdx = null, _scanAllMode = false;
+
+function startScanAll() {
+  _scanAllMode  = true;
+  _scanItemIdx  = null;
+  _lastScanData = null;
+  const overlayErr = document.getElementById('scan-overlay-err');
+  if (overlayErr) overlayErr.style.display = 'none';
+  // Summary of all pending rolls
+  renderScanAllList();
+  document.getElementById('scan-title').textContent = 'Scan Semua Roll';
+  document.getElementById('scan-overlay').style.display = 'flex';
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(function(stream) {
+      _scanStream = stream;
+      const video = document.getElementById('scan-video');
+      video.srcObject = stream; video.play();
+      _scanRAF = requestAnimationFrame(tickScan);
+    }).catch(function() {
+      document.getElementById('scan-overlay').style.display = 'none';
+    });
+  setTimeout(function() {
+    const inp = document.getElementById('scan-manual-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+  }, 300);
+}
+
+function renderScanAllList() {
+  const el = document.getElementById('scan-roll-list');
+  if (!el) return;
+  const scan = window._pickScan || [];
+  const totalScanned = scan.reduce((a,s)=>a+s.scanned.length, 0);
+  const totalNeeded  = scan.reduce((a,s)=>a+s.needed, 0);
+  const rows = scan.map(function(s) {
+    const done = s.scanned.length >= s.needed;
+    const dots = Array.from({length: s.needed}, (_,i) => {
+      const d = i < s.scanned.length, n = i === s.scanned.length;
+      return `<div style="width:9px;height:9px;border-radius:50%;background:${d?'#10b981':n?'#f97316':'#334155'};${n?'box-shadow:0 0 0 2px rgba(249,115,22,.35)':''}"></div>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;gap:.6rem;padding:.3rem .5rem;border-radius:7px;margin-bottom:.25rem;background:${done?'rgba(16,185,129,.1)':'rgba(255,255,255,.04)'}">
+      <span style="font-weight:700;font-size:.78rem;color:${done?'#10b981':'#f97316'};min-width:2.2rem">${(s.fifoRolls[0]?.sku||'')+s.code}</span>
+      <span style="font-size:.65rem;color:#64748b">${s.gsm}</span>
+      <div style="display:flex;gap:.2rem;margin-left:auto">${dots}</div>
+      <span style="font-size:.72rem;font-weight:700;color:${done?'#10b981':'#94a3b8'};min-width:2rem;text-align:right">${s.scanned.length}/${s.needed}</span>
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.25rem .5rem .4rem;border-bottom:1px solid #1e293b;margin-bottom:.35rem">
+      <span style="font-size:.7rem;color:#64748b">Progress</span>
+      <span style="font-size:.82rem;font-weight:800;color:${totalScanned===totalNeeded?'#10b981':'#f97316'}">${totalScanned} / ${totalNeeded} roll</span>
+    </div>
+    ${rows}`;
+}
+
+function renderScanRollList(itemIdx) {
+  const el = document.getElementById('scan-roll-list');
+  if (!el) return;
+  const item = (window._pickScan || [])[itemIdx];
+  if (!item) { el.innerHTML = ''; return; }
+  const dots = Array.from({length: item.needed}, (_,i) => {
+    const done   = i < item.scanned.length;
+    const isNext = i === item.scanned.length;
+    return `<div style="display:flex;align-items:center;gap:.4rem">
+      <div style="width:12px;height:12px;border-radius:50%;background:${done?'#10b981':isNext?'#f97316':'#334155'};
+        ${isNext?'box-shadow:0 0 0 3px rgba(249,115,22,.3)':''}"></div>
+      <span style="font-size:.72rem;color:${done?'#10b981':isNext?'#f97316':'#475569'};font-weight:${isNext?'700':'400'}">
+        Roll ${i+1}${done?' ✓':''}
+      </span>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:.5rem .9rem;padding:.1rem 0">${dots}</div>`;
+}
+
+function startScan(itemIdx) {
+  _scanAllMode  = false;
+  _scanItemIdx  = itemIdx;
+  const item   = (window._pickScan || [])[itemIdx];
+  if (!item) return;
+  document.getElementById('scan-title').textContent = 'Scan Roll ' + (item.scanned.length + 1) + ' — ' + item.code + ' ' + item.gsm;
+  document.getElementById('scan-hint').textContent  = 'Arahkan ke QR stiker roll';
+  renderScanRollList(itemIdx);
+  _lastScanData = null;
+  const overlayErr = document.getElementById('scan-overlay-err');
+  if (overlayErr) overlayErr.style.display = 'none';
+  const overlay = document.getElementById('scan-overlay');
+  overlay.style.display = 'flex';
+  setTimeout(function() {
+    const inp = document.getElementById('scan-manual-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+  }, 300);
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(function(stream) {
+      _scanStream = stream;
+      const video = document.getElementById('scan-video');
+      video.srcObject = stream;
+      video.play();
+      _scanRAF = requestAnimationFrame(tickScan);
+    })
+    .catch(function(err) {
+      stopScan();
+      alert('Kamera tidak dapat diakses: ' + err.message);
+    });
+}
+
+function tickScan() {
+  const video  = document.getElementById('scan-video');
+  const canvas = document.getElementById('scan-canvas');
+  if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    _scanRAF = requestAnimationFrame(tickScan); return;
+  }
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const code    = window.jsQR && jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
+  if (code && code.data) {
+    onQrScanned(code.data);
+    return;
+  }
+  _scanRAF = requestAnimationFrame(tickScan);
+}
+
+function stopScan() {
+  if (_scanRAF) { cancelAnimationFrame(_scanRAF); _scanRAF = null; }
+  if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+  document.getElementById('scan-video').srcObject = null;
+  document.getElementById('scan-overlay').style.display = 'none';
+}
+
+// Pause: stop camera but keep scanned data, return to modal
+function pauseScan() {
+  if (_scanRAF) { cancelAnimationFrame(_scanRAF); _scanRAF = null; }
+  if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+  document.getElementById('scan-video').srcObject = null;
+  document.getElementById('scan-overlay').style.display = 'none';
+  _lastScanData = null;
+  // Refresh modal list to show current scan state
+  if (window._pickRenderItems) window._pickRenderItems();
+}
+
+let _lastScanData = null; // prevent camera from repeatedly triggering same QR
+
+function showScanError(msg) {
+  const el = document.getElementById('scan-overlay-err');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(function() { el.style.display = 'none'; _lastScanData = null; }, 2500);
+}
+
+function onQrScanned(data) {
+  if (!data || !data.trim()) return;
+  // Debounce camera: ignore same QR repeated within 2.5s
+  if (data === _lastScanData) return;
+  _lastScanData = data;
+
+  // Exact match only — trim whitespace
+  const norm    = data.trim();
+  const parts   = norm.split(' / ');
+  const qrCode  = (parts[0]||'').toUpperCase();
+  const qrGsm   = (parts[1]||'').replace(/^GSM-/i,'').trim();
+  const hasRoll = /ROLL\s*\d+/i.test(parts[2]||'');
+  const scan    = window._pickScan || [];
+
+  // Auto-detect matching item (bulk mode) or use specific item index
+  let item = null;
+  if (_scanAllMode) {
+    item = scan.find(function(s) {
+      if (s.scanned.length >= s.needed) return false;
+      const g = (s.gsm||'').match(/\d+/)?.[0] || '';
+      return qrCode.endsWith(s.code.toUpperCase()) && qrGsm === g && hasRoll
+          && !s.scanned.map(x=>x.toUpperCase()).includes(norm.toUpperCase());
+    });
+  } else {
+    item = scan[_scanItemIdx];
+    if (item) {
+      const g = (item.gsm||'').match(/\d+/)?.[0] || '';
+      const alreadyScanned = item.scanned.map(s=>s.toUpperCase()).includes(norm.toUpperCase());
+      if (!qrCode.endsWith(item.code.toUpperCase()) || qrGsm !== g || !hasRoll || alreadyScanned) item = null;
+    }
+  }
+
+  if (!item) {
+    // Debug: find closest mismatch reason
+    let reason = 'tiada item sepadan';
+    const scan2 = window._pickScan || [];
+    for (const s of scan2) {
+      const g = (s.gsm||'').match(/\d+/)?.[0] || '';
+      const codeMatch = qrCode.endsWith(s.code.toUpperCase());
+      const gsmMatch  = qrGsm === g;
+      const rollMatch = hasRoll;
+      const fullMatch = codeMatch && gsmMatch && rollMatch;
+      const isDup = s.scanned.map(x=>x.toUpperCase()).includes(norm.toUpperCase());
+      const isFull = s.scanned.length >= s.needed;
+      if (codeMatch && gsmMatch) {
+        if (isFull)  reason = s.code + ' ' + s.gsm + ' dah penuh (' + s.scanned.length + '/' + s.needed + ')';
+        else if (isDup) reason = 'QR dah discan sebelum ini';
+        else if (!rollMatch) reason = 'format ROLL salah';
+        break;
+      }
+    }
+    console.warn('Scan rejected:', norm, '| qrCode:', qrCode, '| qrGsm:', qrGsm, '| hasRoll:', hasRoll, '| reason:', reason);
+    showScanError('❌ ' + reason);
+    const inp = document.getElementById('scan-manual-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+    if (_scanStream) { _scanRAF = requestAnimationFrame(tickScan); }
+    return;
+  }
+
+  // Valid — in bulk mode keep camera running; in single mode stop
+  if (!_scanAllMode && _scanStream) {
+    cancelAnimationFrame(_scanRAF); _scanRAF = null;
+    _scanStream.getTracks().forEach(t=>t.stop()); _scanStream = null;
+    document.getElementById('scan-video').srcObject = null;
+  }
+  _lastScanData = null;
+
+  const pickErrEl = document.getElementById('pick-err');
+  if (pickErrEl) pickErrEl.style.display = 'none';
+  const overlayErr = document.getElementById('scan-overlay-err');
+  if (overlayErr) overlayErr.style.display = 'none';
+
+  item.scanned.push(norm);
+  toast('✅ ' + item.code + ' Roll ' + item.scanned.length + ' diimbas');
+  if (window._pickRenderItems) window._pickRenderItems();
+
+  const allDone = (window._pickScan||[]).every(s => s.scanned.length >= s.needed);
+
+  if (_scanAllMode) {
+    renderScanAllList();
+    if (allDone) {
+      // Stop camera, close overlay
+      if (_scanStream) { cancelAnimationFrame(_scanRAF); _scanRAF = null; _scanStream.getTracks().forEach(t=>t.stop()); _scanStream = null; document.getElementById('scan-video').srcObject = null; }
+      document.getElementById('scan-overlay').style.display = 'none';
+      toast('✅ Semua roll selesai diimbas!');
+    } else {
+      const inp = document.getElementById('scan-manual-input');
+      if (inp) { inp.value = ''; inp.focus(); }
+      // Update title with remaining count
+      const remaining = (window._pickScan||[]).reduce((s,x)=>s+(x.needed-x.scanned.length),0);
+      document.getElementById('scan-title').textContent = 'Scan Semua Roll (' + remaining + ' lagi)';
+    }
+  } else {
+    renderScanRollList(_scanItemIdx);
+    const allItemDone = item.scanned.length >= item.needed;
+    if (allItemDone) {
+      document.getElementById('scan-overlay').style.display = 'none';
+    } else {
+      const inp = document.getElementById('scan-manual-input');
+      if (inp) { inp.value = ''; inp.focus(); }
+      document.getElementById('scan-title').textContent = 'Scan Roll ' + (item.scanned.length + 1) + ' — ' + item.code + ' ' + item.gsm;
+    }
+  }
+}
+
+async function confirmFabricPick() {
+  const reqId = window._pickReqId;
+  const scan  = window._pickScan || [];
+  const errEl = document.getElementById('pick-err');
+  const btn   = document.getElementById('pick-confirm-btn');
+
+  const showErr = (msg) => { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } };
+
+  if (!reqId)       { showErr('❌ Request ID tidak ditemui.'); return; }
+  if (!scan.length) { showErr('❌ Tiada item untuk pick.'); return; }
+  const notScanned = scan.filter(s => s.scanned.length < s.needed);
+  if (notScanned.length) {
+    showErr('❌ Belum scan: ' + notScanned.map(s => s.code + ' ' + s.gsm + ' (' + s.scanned.length + '/' + s.needed + ')').join(', '));
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyimpan...'; }
+  const user = _user?.full_name || _user?.username || 'Staff';
+
+  try {
+    // Get fabric material_id — all fabric movements share ONE material record (is_fabric_roll=true)
+    let fabMatId = window._pickMatId;
+    if (!fabMatId) {
+      const { data: fabMats } = await sb.from('raw_materials').select('id, current_stock').eq('is_fabric_roll', true).limit(1);
+      fabMatId = fabMats?.[0]?.id || null;
+    }
+
+    // Build movements (one per item)
+    const totalMeter = scan.reduce((s, it) => s + (it.meter || 0), 0);
+    const movements  = scan.map(it => {
+      const gsmNum = (it.gsm || '').replace(/gsm$/i,'').trim(); // "173gsm" → "173"
+      return {
+        material_id: fabMatId,
+        type: 'out',
+        qty: it.meter || 0,
+        reference: 'FR · gsm-' + gsmNum + '/' + it.code + ' · ' + it.needed + ' roll',
+        note: reqId + ' | ' + it.scanned.join(' | '),
+        created_by: user
+      };
+    });
+
+    // Build parallel DB calls
+    const calls = [
+      sb.from('raw_material_movements').insert(movements),
+      sb.from('production_material_requests').update({ status: 'Issued', reviewed_by: user, reviewed_at: new Date().toISOString() }).eq('id', reqId)
+    ];
+
+    // Update stock if we have the fabric material
+    if (fabMatId) {
+      const { data: fabMat } = await sb.from('raw_materials').select('current_stock').eq('id', fabMatId).single();
+      const newStock = Math.max(0, (fabMat?.current_stock || 0) - totalMeter);
+      calls.push(sb.from('raw_materials').update({ current_stock: newStock }).eq('id', fabMatId));
+    }
+
+    const results = await Promise.all(calls);
+    // Check for Supabase errors
+    const failed = results.find(r => r?.error);
+    if (failed?.error) throw new Error(failed.error.message);
+
+    // Store DO data for printing
+    const doDate = new Date();
+    const refSuffix = (window._pickRef || '').trim() || reqId.slice(-4).toUpperCase();
+    const doNo = 'DO-' + doDate.getFullYear() + ('0'+(doDate.getMonth()+1)).slice(-2) + ('0'+doDate.getDate()).slice(-2) + '-' + refSuffix;
+    window._lastDO = { ref: window._pickRef, fab: window._pickFab, scan, user, date: doDate, doNo };
+    const totalRoll  = scan.reduce((s,it)=>s+it.needed,0);
+    const totalMeterAll = scan.reduce((s,it)=>s+(it.meter||0),0);
+
+    // Show success screen with Print DO + Dispatch buttons
+    document.getElementById('modal-sheet').innerHTML = `
+      <div class="modal-handle"></div>
+      <div style="padding:2rem 1.25rem 1.5rem">
+        <div style="text-align:center;margin-bottom:1.5rem">
+          <div style="font-size:2.8rem;margin-bottom:.5rem">✅</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--green);margin-bottom:.25rem">${totalRoll} Roll Diterbitkan</div>
+          <div style="font-size:.78rem;color:var(--muted)">Ref: ${window._pickRef || '—'} &nbsp;·&nbsp; Jumlah ${totalMeterAll.toFixed(1)}m</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem;font-family:monospace">${doNo}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+          <button onclick="openDispatchModal('${doNo}')" style="width:100%;padding:.75rem;background:var(--orange);border:none;border-radius:10px;color:#fff;font-size:.9rem;font-weight:800;cursor:pointer">🚐 Dispatch ke Fleet</button>
+          <div style="display:flex;gap:.5rem">
+            <button onclick="closeModal()" style="flex:1;padding:.65rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;cursor:pointer">Tutup</button>
+            <button onclick="printFabricDO()" style="flex:1;padding:.65rem;background:var(--cyan);border:none;border-radius:10px;color:#fff;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Print DO</button>
+          </div>
+        </div>
+      </div>`;
+    loadPickRequests();
+    loadPickBadge();
+  } catch(err) {
+    console.error('confirmFabricPick error:', err);
+    showErr('❌ ' + (err.message || 'Ralat berlaku.'));
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Pick'; }
+  }
+}
+
+function parseFabricInfo(str) {
+  if (!str) return null;
+  if (str.trim().startsWith('{')) {
+    try {
+      const obj = JSON.parse(str);
+      return { _json: true, fab: obj.fab || '—', items: obj.items || [], purpose: obj.purpose || '' };
+    } catch(e) {}
+  }
+  const get = key => { const m = str.match(new RegExp(key + ':([^|]+')); return m ? m[1].trim() : '—'; };
+  return { _json: false, rolls: get('rolls'), len: get('total'), gsm: get('gsm'), type: get('type') };
+}
+
+/* ════════════════════════════════════════════
+   FABRIC DO PRINT
+════════════════════════════════════════════ */
+async function printFabricDO(reqId) {
+  // If called from dispatch list with reqId, fetch from DB
+  if (reqId && (!window._lastDO || window._lastDO.reqId !== reqId)) {
+    const [{ data: r }, { data: movs }] = await Promise.all([
+      sb.from('production_material_requests').select('*, material:material_id(name)').eq('id', reqId).single(),
+      sb.from('raw_material_movements').select('qty, reference, note, created_by').eq('type','out').like('note', reqId + ' |%')
+    ]);
+    if (!r) { toast('❌ Request tidak ditemui'); return; }
+    const date = r.reviewed_at ? new Date(r.reviewed_at) : new Date();
+    const refSuffix = (r.order_ref||'').replace('FABRIC|','').replace(/^—$/,'').trim() || r.id.slice(-4).toUpperCase();
+    const doNo = 'DO-' + date.getFullYear() + ('0'+(date.getMonth()+1)).slice(-2) + ('0'+date.getDate()).slice(-2) + '-' + refSuffix;
+    let info = {}; try { info = JSON.parse(r.reason||'{}'); } catch(e) {}
+    const scan = (info.items||[]).map(function(it){ return { code: it.code, gsm: it.gsm, needed: it.rolls, meter: it.meter||0, scanned: [] }; });
+    window._lastDO = { ref: refSuffix, fab: info.fab||r.material?.name||'Fabric Roll', scan, user: r.reviewed_by||'—', date, doNo, reqId };
+  }
+  const do_ = window._lastDO;
+  if (!do_) return;
+
+  const { ref, fab, scan, user, date, doNo: storedDoNo } = do_;
+  const dateStr  = date.toLocaleDateString('ms-MY', { day:'2-digit', month:'long', year:'numeric' });
+  const timeStr  = date.toLocaleTimeString('ms-MY', { hour:'2-digit', minute:'2-digit' });
+  const doNo     = storedDoNo || ('DO-' + date.getFullYear() + ('0'+(date.getMonth()+1)).slice(-2) + ('0'+date.getDate()).slice(-2) + '-' + reqId?.slice(-4).toUpperCase() || Math.floor(Math.random()*900+100));
+  const totalRoll   = scan.reduce((s,it)=>s+it.needed, 0);
+  const totalMeter  = scan.reduce((s,it)=>s+(it.meter||0), 0);
+
+  const rows = scan.map(it => {
+    const qrLines = it.scanned.map(q =>
+      `<div style="font-size:9px;font-family:monospace;color:#555;margin-top:2px">• ${q}</div>`
+    ).join('');
+    return `<tr>
+      <td>${(it.fifoRolls&&it.fifoRolls[0]?.sku||'')+it.code}</td>
+      <td>${it.gsm}</td>
+      <td style="text-align:center">${it.needed}</td>
+      <td style="text-align:right">${(it.meter||0).toFixed(1)} m</td>
+      <td>${qrLines}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>DO ${doNo}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: Arial, sans-serif; font-size:11px; color:#111; padding:24px 28px; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }
+    .company { font-size:16px; font-weight:700; }
+    .doc-title { text-align:right; }
+    .doc-title h2 { font-size:18px; font-weight:800; letter-spacing:1px; }
+    .doc-title p { font-size:10px; color:#555; }
+    hr { border:none; border-top:2px solid #111; margin:8px 0; }
+    hr.thin { border-top:1px solid #ccc; margin:6px 0; }
+    .meta { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; margin:10px 0 14px; }
+    .meta span { font-size:10px; color:#555; }
+    .meta strong { font-size:11px; }
+    table { width:100%; border-collapse:collapse; margin-bottom:14px; }
+    th { background:#111; color:#fff; padding:5px 7px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+    td { padding:5px 7px; border-bottom:1px solid #e5e5e5; vertical-align:top; }
+    tr:nth-child(even) td { background:#f9f9f9; }
+    .total-row td { font-weight:700; border-top:2px solid #111; border-bottom:none; }
+    .sig { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; }
+    .sig-box { border-top:1px solid #555; padding-top:4px; }
+    .sig-box p { font-size:10px; color:#555; }
+    @media print { body { padding:0; } button { display:none !important; } }
+  </style></head><body>
+  <div class="header">
+    <div><div class="company">FABRIC STORE</div><div style="font-size:10px;color:#555">Warehouse Management System</div></div>
+    <div class="doc-title"><h2>DELIVERY ORDER</h2><p>${doNo}</p></div>
+  </div>
+  <hr>
+  <div class="meta">
+    <div><span>Tarikh / Date</span><br><strong>${dateStr} ${timeStr}</strong></div>
+    <div><span>Batch Ref</span><br><strong>${ref || '—'}</strong></div>
+    <div><span>Fabric / Produk</span><br><strong>${fab || '—'}</strong></div>
+    <div><span>Dikeluarkan Oleh / Issued By</span><br><strong>${user}</strong></div>
+  </div>
+  <hr class="thin">
+  <table>
+    <thead><tr>
+      <th>Kod</th><th>GSM</th><th style="text-align:center">Roll</th><th style="text-align:right">Meter</th><th>QR Scan</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr class="total-row">
+      <td colspan="2">JUMLAH / TOTAL</td>
+      <td style="text-align:center">${totalRoll}</td>
+      <td style="text-align:right">${totalMeter.toFixed(1)} m</td>
+      <td></td>
+    </tr></tfoot>
+  </table>
+  <div class="sig">
+    <div class="sig-box"><p>Dikeluarkan Oleh / Issued By</p><br><br><p>____________________________<br>${user}</p></div>
+    <div class="sig-box"><p>Diterima Oleh / Received By</p><br><br><p>____________________________<br>Nama &amp; Tarikh</p></div>
+  </div>
+  <div style="margin-top:20px;text-align:center;font-size:9px;color:#aaa">Dokumen ini dijana secara automatik &mdash; ${doNo}</div>
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+
+  const w = window.open('', '_blank', 'width=800,height=600');
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
+/* ════════════════════════════════════════════
+   STICKER GENERATOR
+════════════════════════════════════════════ */
+async function openDispatchModal(doNo, prefillDest, reqId) {
+  const destination = prefillDest || window._pickDestination || '';
+  const INP = 'width:100%;padding:.55rem .7rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;outline:none';
+
+  openModal(`
+    <div class="modal-handle"></div>
+    <div style="padding:.5rem 0 1rem">
+      <div class="modal-title">🚐 Dispatch ke Fleet</div>
+      <div style="font-size:.72rem;font-family:monospace;color:var(--cyan);margin-bottom:1.25rem">${doNo}</div>
+
+      <div style="margin-bottom:.75rem">
+        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:.3rem">Hantar ke</label>
+        <div style="padding:.55rem .7rem;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:.85rem;font-weight:700;color:var(--text)">${destination || '—'}</div>
+        <input id="disp-dest" type="hidden" value="${destination}">
+      </div>
+
+      <div style="margin-bottom:1rem">
+        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:.3rem">Nota</label>
+        <input id="disp-notes" type="text" placeholder="Optional" style="${INP}">
+      </div>
+
+      <div class="form-err" id="disp-err"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem">
+        <button onclick="closeModal()" style="flex:1;padding:.65rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;cursor:pointer">Batal</button>
+        <button onclick="saveDispatch('${doNo}')" style="flex:2;padding:.65rem;background:var(--orange);border:none;border-radius:10px;color:#fff;font-size:.88rem;font-weight:700;cursor:pointer">✅ Confirm Dispatch</button>
+      </div>
+    </div>
+  `);
+}
+
+async function saveDispatch(doNo) {
+  const dest  = document.getElementById('disp-dest')?.value.trim();
+  const notes = document.getElementById('disp-notes')?.value.trim();
+  const errEl = document.getElementById('disp-err');
+  if (!dest) { errEl.textContent = '❌ Sila isi destinasi.'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+
+  const { error } = await sb.from('fleet_trips').insert({
+    do_no: doNo, destination: dest, notes: notes || null, status: 'Assigned', leg: 1
+  });
+  if (error) { errEl.textContent = '❌ ' + error.message; errEl.style.display='block'; return; }
+
+  closeModal();
+  toast('✅ Dispatch berjaya! DO ' + doNo + ' dah masuk Fleet.');
+  if (document.getElementById('screen-dispatch')?.style.display !== 'none') loadDispatchList();
+}
+
+function openStickerSetup() {
+  document.getElementById('btn-print').style.display = 'none';
+  document.getElementById('sticker-preview').style.display = 'none';
+  document.getElementById('sticker-preview').innerHTML = '';
+
+  const { poNo, ops } = _stickerCtx;
+  let html = `<p class="sticker-intro">PO <strong>${poNo}</strong> berjaya diterima.<br>Isi maklumat roll untuk jana stiker QR. Setiap roll dapat stiker tersendiri.</p>`;
+
+  ops.forEach((op, i) => {
+    html += `<div class="sticker-mat-block">
+      <div class="sticker-mat-name">📦 ${op.matName}</div>
+      <div class="field-row">
+        <div class="field"><label>Bilangan Roll / Unit</label><input type="number" min="1" value="1" id="st-rolls-${i}"></div>
+        <div class="field"><label>Panjang per Roll (${op.unit || 'unit'})</label><input type="number" step="any" min="0" value="${op.qty}" id="st-len-${i}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>GSM / Berat</label><input type="text" placeholder="cth: 180 gsm" id="st-gsm-${i}"></div>
+        <div class="field"><label>Jenis / Warna</label><input type="text" placeholder="cth: Chiffon Biru" id="st-type-${i}"></div>
+      </div>
+    </div>`;
+  });
+
+  html += `<button class="btn-generate" onclick="generateStickers()">🏷 Jana Stiker QR</button>`;
+  html += `<button class="btn-skip" onclick="backToMain()">Langkau — Kembali ke Senarai</button>`;
+
+  document.getElementById('sticker-setup').innerHTML = html;
+  goScreen('screen-stickers');
+}
+
+function rollId(matName, date, serial) {
+  const prefix = matName.replace(/[^A-Za-z0-9]/g,'').slice(0,4).toUpperCase();
+  return `ROLL-${prefix}-${date.replace(/-/g,'')}-${String(serial).padStart(3,'0')}`;
+}
+
+let _generatedStickers = [];
+
+async function generateStickers() {
+  const { poNo, ops } = _stickerCtx;
+  const today = new Date().toISOString().slice(0,10);
+  _generatedStickers = [];
+  let serial = 1;
+
+  for (let i = 0; i < ops.length; i++) {
+    const op    = ops[i];
+    const rolls = parseInt(document.getElementById('st-rolls-'+i)?.value) || 1;
+    const len   = document.getElementById('st-len-'+i)?.value  || '';
+    const gsm   = document.getElementById('st-gsm-'+i)?.value  || '';
+    const type  = document.getElementById('st-type-'+i)?.value || '';
+    for (let r = 0; r < rolls; r++) {
+      const id = rollId(op.matName, today, serial++);
+      _generatedStickers.push({ id, poNo, matName: op.matName, unit: op.unit || 'm', date: today, len, gsm, type, rollNum: r+1, totalRolls: rolls });
+    }
+  }
+
+  const prev = document.getElementById('sticker-preview');
+  prev.innerHTML = '';
+  prev.style.display = 'block';
+  document.getElementById('sticker-setup').style.display = 'none';
+  document.getElementById('btn-print').style.display = 'none';
+
+  for (let idx = 0; idx < _generatedStickers.length; idx++) {
+    const st = _generatedStickers[idx];
+    const wrap = document.createElement('div');
+    wrap.id = 'sticker-wrap-' + idx;
+    wrap.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:12px;padding:.9rem;margin-bottom:.75rem';
+
+    // Header row: name + roll counter
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.5rem';
+    header.innerHTML = `<div style="font-size:.85rem;font-weight:800">${st.matName}</div>
+      <div style="font-size:.65rem;color:var(--muted)">Roll ${st.rollNum} / ${st.totalRolls}</div>`;
+
+    // QR canvas
+    const cvs = document.createElement('canvas');
+    cvs.style.cssText = 'display:block;margin:0 auto .5rem';
+
+    // Info + editable meter
+    const info = document.createElement('div');
+    info.style.cssText = 'font-size:.72rem;color:var(--muted);margin-bottom:.5rem;text-align:center';
+    info.innerHTML = `<span>📅 ${st.date}</span> &nbsp; <span>⚖ ${st.gsm||'—'}</span> &nbsp; <span>🏷 ${st.type||'—'}</span>`;
+
+    const meterRow = document.createElement('div');
+    meterRow.style.cssText = 'display:flex;align-items:center;gap:.5rem;margin-bottom:.65rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.4rem .7rem';
+    meterRow.innerHTML = `<span style="font-size:.72rem;color:var(--muted);white-space:nowrap">📐 Meter:</span>
+      <input id="st-edit-meter-${idx}" type="number" step="any" value="${st.len}"
+        style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:.9rem;font-weight:700;text-align:right"
+        onchange="_generatedStickers[${idx}].len=this.value">
+      <span style="font-size:.72rem;color:var(--muted)">${st.unit}</span>`;
+
+    const stickerId = document.createElement('div');
+    stickerId.style.cssText = 'font-size:.62rem;color:var(--muted);text-align:center;margin-bottom:.6rem;font-family:monospace';
+    stickerId.textContent = st.id;
+
+    const printBtn = document.createElement('button');
+    printBtn.textContent = '🖨 Print Stiker Ini';
+    printBtn.style.cssText = 'width:100%;padding:.6rem;background:var(--orange);color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer';
+    printBtn.onclick = () => printSingleSticker(idx);
+
+    wrap.appendChild(header);
+    wrap.appendChild(cvs);
+    wrap.appendChild(info);
+    wrap.appendChild(meterRow);
+    wrap.appendChild(stickerId);
+    wrap.appendChild(printBtn);
+    prev.appendChild(wrap);
+
+    // Generate QR with current data
+    const qrData = JSON.stringify({ id: st.id, po: st.poNo, mat: st.matName, tarikh: st.date, qty: st.len + ' ' + st.unit, gsm: st.gsm, jenis: st.type });
+    QRCode.toCanvas(cvs, qrData, { width: 120, margin: 1, color: { dark: '#000', light: '#fff' } }, err => { if (err) console.error(err); });
+  }
+
+  toast('✅ ' + _generatedStickers.length + ' stiker dijana!');
+}
+
+function printSingleSticker(idx) {
+  const st = _generatedStickers[idx];
+  // Read edited meter from input
+  const meter = document.getElementById('st-edit-meter-' + idx)?.value || st.len;
+  const qrData = JSON.stringify({ id: st.id, po: st.poNo, mat: st.matName, tarikh: st.date, qty: meter + ' ' + st.unit, gsm: st.gsm, jenis: st.type });
+
+  // Generate fresh QR as data URL then open print window
+  const tmpCvs = document.createElement('canvas');
+  QRCode.toCanvas(tmpCvs, qrData, { width: 200, margin: 1, color: { dark: '#000', light: '#fff' } }, function(err) {
+    const qrUrl = tmpCvs.toDataURL();
+    const win = window.open('', '_blank', 'width=400,height=500');
+    win.document.write(`<!DOCTYPE html><html><head><title>Stiker ${st.id}</title>
+    <style>
+      body { margin:0; padding:16px; font-family:-apple-system,sans-serif; text-align:center; }
+      .sticker { border:2px solid #000; border-radius:8px; padding:12px; display:inline-block; min-width:200px; }
+      .mat-name { font-size:14px; font-weight:900; margin-bottom:4px; }
+      .roll-cnt { font-size:10px; color:#666; margin-bottom:8px; }
+      img.qr { width:160px; height:160px; display:block; margin:0 auto 8px; }
+      .meter { font-size:18px; font-weight:800; margin-bottom:4px; }
+      .info { font-size:10px; color:#444; margin-bottom:4px; }
+      .sid { font-size:9px; color:#888; font-family:monospace; }
+      @media print { body { margin:0; } button { display:none; } }
+    </style></head><body>
+    <div class="sticker">
+      <div class="mat-name">${st.matName}</div>
+      <div class="roll-cnt">Roll ${st.rollNum} / ${st.totalRolls}</div>
+      <img class="qr" src="${qrUrl}">
+      <div class="meter">${meter} ${st.unit}</div>
+      <div class="info">PO: ${st.poNo} &nbsp;|&nbsp; ${st.date}</div>
+      <div class="info">GSM: ${st.gsm||'—'} &nbsp;|&nbsp; ${st.type||'—'}</div>
+      <div class="sid">${st.id}</div>
+    </div>
+    <br>
+    <button onclick="window.print()" style="padding:8px 20px;font-size:14px;cursor:pointer;margin-top:8px">🖨 Print</button>
+    <script>setTimeout(()=>window.print(),400);<\/script>
+    </body></html>`);
+    win.document.close();
+  });
+}
+
+function backToMain() {
+  document.getElementById('sticker-setup').style.display = '';
+  document.getElementById('sticker-preview').style.display = 'none';
+  document.getElementById('btn-print').style.display = 'none';
+  goScreen('screen-receive');
+  loadPOList();
+}
+
+/* ════════════════════════════════════════════
+   I18N — LANGUAGE TOGGLE
+════════════════════════════════════════════ */
+let _lang = localStorage.getItem('rm_lang') || 'bm';
+
+const _tr = {
+  bm: {
+    login_sub:    'Terima Bahan & Proses Permintaan',
+    username:     'Nama Pengguna',
+    password:     'Kata Laluan',
+    login_btn:    'Log Masuk',
+    login_err1:   'Sila masukkan nama pengguna dan kata laluan.',
+    login_err2:   'Nama pengguna atau kata laluan tidak sah.',
+    logout:       'Log Keluar',
+    select_fn:    'Pilih Fungsi',
+    receive_title:'Terima Bahan',
+    receive_desc: 'Terima PO & cetak stiker QR',
+    pick_title:   'Proses Permintaan',
+    pick_desc:    'Keluarkan bahan ke bahagian pengeluaran',
+    pick_pending: ' permintaan menunggu',
+    po_label:     ' PO menunggu penerimaan',
+    po_empty1:    'Tiada PO yang perlu diterima.',
+    po_empty2:    'PO perlu dihantar dahulu dari papan pemuka.',
+    req_label:    ' permintaan menunggu diproses',
+    req_empty1:   'Tiada permintaan yang perlu diproses.',
+    req_empty2:   'Permintaan perlu diluluskan dahulu dari papan pemuka.',
+    req_by:       'Diminta oleh: ',
+    tap_process:  'Ketik untuk proses ›',
+    modal_process:'⚙️ Proses Permintaan',
+    qty_diminta:  'Kuantiti diminta',
+    stok_semasa:  'Stok semasa',
+    qty_issue:    'Kuantiti untuk dikeluarkan',
+    notes_opt:    'Nota (pilihan)',
+    notes_ph:     'Cth: Dikeluarkan terus ke barisan pengeluaran A',
+    batal:        'Batal',
+    issue_btn:    '⚙️ Keluarkan & Proses',
+    err_qty:      'Sila masukkan kuantiti yang sah.',
+    err_stok:     'Stok tidak mencukupi! Stok semasa: ',
+    saving:       '⏳ Menyimpan...',
+    toast_issue:  '✅ Permintaan diproses! ',
+    issued:       ' dikeluarkan.',
+    sahkan:       '✅ Sahkan Penerimaan',
+    recv_title:   'Dipesan',
+    loading:      '⏳ Memuatkan...',
+    loading_req:  '⏳ Memuatkan permintaan...',
+  },
+  en: {
+    login_sub:    'Receive Materials & Pick Requests',
+    username:     'Username',
+    password:     'Password',
+    login_btn:    'Log In',
+    login_err1:   'Please enter username and password.',
+    login_err2:   'Invalid username or password.',
+    logout:       'Logout',
+    select_fn:    'Select Function',
+    receive_title:'Receive Material',
+    receive_desc: 'Receive PO & generate QR stickers',
+    pick_title:   'Pick Request',
+    pick_desc:    'Issue materials to production',
+    pick_pending: ' requests pending',
+    po_label:     ' PO awaiting receipt',
+    po_empty1:    'No pending POs to receive.',
+    po_empty2:    'PO must be submitted from the dashboard first.',
+    req_label:    ' requests awaiting pick',
+    req_empty1:   'No requests to process.',
+    req_empty2:   'Requests must be Approved from the dashboard first.',
+    req_by:       'Requested by: ',
+    tap_process:  'Tap to process ›',
+    modal_process:'⚙️ Process Request',
+    qty_diminta:  'Qty requested',
+    stok_semasa:  'Current stock',
+    qty_issue:    'Qty to issue',
+    notes_opt:    'Notes (optional)',
+    notes_ph:     'e.g. Issued directly to production line A',
+    batal:        'Cancel',
+    issue_btn:    '⚙️ Issue & Process',
+    err_qty:      'Please enter a valid quantity.',
+    err_stok:     'Insufficient stock! Current stock: ',
+    saving:       '⏳ Saving...',
+    toast_issue:  '✅ Request processed! ',
+    issued:       ' issued.',
+    sahkan:       '✅ Confirm Receive',
+    recv_title:   'Ordered',
+    loading:      '⏳ Loading...',
+    loading_req:  '⏳ Loading requests...',
+  }
+};
+
+function t(key) { return (_tr[_lang] || _tr['bm'])[key] || key; }
+
+function applyLang() {
+  // Static elements with data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (_tr[_lang][key]) el.textContent = _tr[_lang][key];
+  });
+  // Placeholder elements
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.getAttribute('data-i18n-ph');
+    if (_tr[_lang][key]) el.placeholder = _tr[_lang][key];
+  });
+  // Lang label buttons
+  const currLabel = _lang === 'bm' ? 'BM' : 'EN';
+  document.querySelectorAll('[id^="lang-label"]').forEach(el => el.textContent = currLabel);
+}
+
+function toggleLang() {
+  _lang = _lang === 'bm' ? 'en' : 'bm';
+  localStorage.setItem('rm_lang', _lang);
+  applyLang();
+}
+
+/* ─── INIT ──────────────────────────────────── */
+applyLang();
+checkSession();
+</script>
+</body>
+</html>
