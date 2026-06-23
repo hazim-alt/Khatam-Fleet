@@ -267,3 +267,128 @@ jobs:
         with:
           name: khatam-receive-apk
           path: build-receive/app/build/outputs/apk/release/app-release.apk
+          build-rawmat:
+    name: Build Raw Material APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Restore keystore
+        run: |
+          mkdir -p build-rawmat
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > build-rawmat/android.keystore
+
+      - name: Setup Raw Material App Icon
+        run: |
+          sudo apt-get install -y imagemagick
+          mkdir -p build-rawmat/app/src/main/res/mipmap-mdpi
+          mkdir -p build-rawmat/app/src/main/res/mipmap-hdpi
+          mkdir -p build-rawmat/app/src/main/res/mipmap-xhdpi
+          mkdir -p build-rawmat/app/src/main/res/mipmap-xxhdpi
+          mkdir -p build-rawmat/app/src/main/res/mipmap-xxxhdpi
+          convert rawmat-icon.png -resize 48x48 build-rawmat/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert rawmat-icon.png -resize 72x72 build-rawmat/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert rawmat-icon.png -resize 96x96 build-rawmat/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert rawmat-icon.png -resize 144x144 build-rawmat/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert rawmat-icon.png -resize 192x192 build-rawmat/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+      - name: Create Android project
+        run: |
+          cd build-rawmat
+          mkdir -p app/src/main/res/values
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+          cat > settings.gradle << 'EOF'
+          rootProject.name = "KhatamRawMat"
+          include ':app'
+          EOF
+          cat > build.gradle << 'EOF'
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.1.4' }
+          }
+          allprojects { repositories { google(); mavenCentral() } }
+          EOF
+          cat > app/build.gradle << 'EOF'
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'com.khatam.rawmat'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.khatam.rawmat'
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0.0'
+              }
+              signingConfigs {
+                  release {
+                      storeFile file('../android.keystore')
+                      storePassword 'khatam123'
+                      keyAlias 'khatam'
+                      keyPassword 'khatam123'
+                  }
+              }
+              buildTypes {
+                  release { signingConfig signingConfigs.release; minifyEnabled false }
+              }
+          }
+          dependencies {
+              implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+          }
+          EOF
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-feature android:name="android.hardware.camera" android:required="false"/>
+              <application
+                  android:label="Raw Material"
+                  android:icon="@mipmap/ic_launcher"
+                  android:theme="@android:style/Theme.NoTitleBar">
+                  <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
+                      <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://hazim-alt.github.io/Khatam-Fleet/rawmat-app.html"/>
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <service android:name="com.google.androidbrowserhelper.trusted.DelegationService" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE"/>
+                          <category android:name="android.intent.category.DEFAULT"/>
+                      </intent-filter>
+                  </service>
+              </application>
+          </manifest>
+          EOF
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">Raw Material</string>
+          </resources>
+          EOF
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
+
+      - name: Build Raw Material APK
+        working-directory: build-rawmat
+        run: gradle assembleRelease
+
+      - name: Upload Raw Material APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: khatam-rawmat-apk
+          path: build-rawmat/app/build/outputs/apk/release/app-release.apk
