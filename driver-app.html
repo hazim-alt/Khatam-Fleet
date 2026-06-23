@@ -1735,7 +1735,6 @@ function buildDeliveryItem(trip, idx) {
     statusText = '📋 Assigned — Scan cartons to depart';
     actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
       + '<button class="btn-arrived-sm" style="background:#6366f1" onclick="openScanForTrip(\'' + trip.id + '\')">📦 Scan Cartons</button>'
-      + '<button class="btn-arrived-sm" style="background:#f59e0b;color:#000" onclick="departTrip(\'' + trip.id + '\')">🚀 Depart (Skip Scan)</button>'
       + '</div>';
   } else {
     // Leg 2 departed: mark arrived
