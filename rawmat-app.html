@@ -766,6 +766,24 @@ async function openPOReceiveForm(poId, poNo, supplier, status) {
 
     const details = po.details ? (typeof po.details === 'string' ? JSON.parse(po.details) : po.details) : [];
 
+    // Non-fabric: just show received summary
+    if (po.rm_type !== 'Fabric Roll') {
+      let recvDetails = {};
+      try { recvDetails = po.received_details ? (typeof po.received_details === 'string' ? JSON.parse(po.received_details) : po.received_details) : {}; } catch(e) {}
+      el.innerHTML = '<div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Items Received</div>'
+        + (details.length ? details.map(function(it, idx) {
+            const name = it.code || it.item_name || '—';
+            const ord  = parseFloat(it.meter || it.qty || 0);
+            const recv = parseFloat(recvDetails[idx] || 0);
+            return `<div style="background:var(--card);border:1px solid var(--green);border-radius:10px;padding:.75rem .9rem;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:.85rem;font-weight:700">${name}</div>
+              <div style="font-size:.78rem;color:var(--green);font-weight:700">✅ ${recv > 0 ? recv : ord}</div>
+            </div>`;
+          }).join('')
+          : '<div style="text-align:center;color:var(--muted);font-size:.78rem;padding:.75rem">Tiada item.</div>');
+      return;
+    }
+
     // Fetch movements for this PO
     const { data: moves } = await sb.from('raw_material_movements').select('qty,reference').order('created_at',{ascending:false}).limit(500);
     const latestByRef = {};
@@ -1067,40 +1085,102 @@ async function openPOReceiveForm(poId, poNo, supplier, status) {
   }
 
   // ── REGULAR PO (Packaging / Trims / etc) ────────
-  const { data: items } = await sb.from('raw_material_po_items')
-    .select('id, qty_ordered, qty_received, material:material_id(id, name, unit, current_stock)')
-    .eq('po_id', poId);
+  // Parse items from po.details JSON (items are stored there, not in raw_material_po_items)
+  const poDetails = po.details
+    ? (typeof po.details === 'string' ? JSON.parse(po.details) : po.details)
+    : [];
 
-  if (!items || !items.length) {
+  if (!poDetails || !poDetails.length) {
     el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.8rem">' + (_lang==='bm'?'Tiada item dalam PO ini.':'No items in this PO.') + '</div>';
     return;
   }
 
+  // Parse previously received qtys if any (stored in po.received_details, may not exist)
+  let recvDetails = {};
+  try { recvDetails = po.received_details ? (typeof po.received_details === 'string' ? JSON.parse(po.received_details) : po.received_details) : {}; } catch(e) {}
+
+  el.dataset.isSimple = 'true';
+
+  // Restore confirmed state for this PO (persists across Back navigation)
+  if (!window._simpleRecvConfirmedByPO) window._simpleRecvConfirmedByPO = {};
+  if (!window._simpleRecvConfirmedByPO[poId]) window._simpleRecvConfirmedByPO[poId] = {};
+  window._simpleRecvConfirmed = window._simpleRecvConfirmedByPO[poId];
+
+  // Disable main receive button until all confirmed
+  const mainBtn = document.getElementById('po-recv-btn');
+  if (mainBtn) { mainBtn.disabled = true; mainBtn.style.opacity = '0.35'; mainBtn.style.cursor = 'not-allowed'; }
+
   el.innerHTML = '<div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">'
     + (_lang==='bm'?'Item PO — Masukkan Kuantiti Diterima':'PO Items — Enter Qty Received') + '</div>'
-    + items.map(function(it) {
-      const mat  = it.material || {};
-      const ord  = it.qty_ordered  || 0;
-      const recv = it.qty_received || 0;
+    + poDetails.map(function(it, idx) {
+      const name = it.code || it.item_name || '—';
+      const ord  = parseFloat(it.meter || it.qty || 0);
+      const recv = parseFloat(recvDetails[idx] || 0);
       const rem  = Math.max(0, ord - recv);
-      const pct  = ord ? Math.round(recv/ord*100) : 0;
-      const pctColor = pct >= 100 ? 'var(--green)' : pct > 0 ? 'var(--orange)' : 'var(--border)';
-      return `<div data-item-id="${it.id}" data-mat-id="${mat.id||''}" data-mat-name="${mat.name||'—'}" data-unit="${mat.unit||''}" data-stock="${mat.current_stock||0}"
-        style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.75rem .9rem;margin-bottom:.55rem">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem">
-          <div style="font-size:.85rem;font-weight:700">${mat.name||'—'}</div>
-          <div style="font-size:.65rem;color:var(--muted)">PO: ${ord} ${mat.unit||''}${recv>0?' · Received: '+recv:''}${rem>0?' · Remaining: '+rem:''}</div>
+      const alreadyRecv = recv > 0;
+      return `<div id="po-recv-card-${idx}" data-idx="${idx}" data-name="${name}" data-ord="${ord}"
+        style="background:var(--card);border:1px solid ${alreadyRecv?'var(--green)':'var(--border)'};border-radius:10px;padding:.75rem .9rem;margin-bottom:.55rem;transition:.2s">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <div style="font-size:.85rem;font-weight:700">${name}</div>
+          <div style="font-size:.65rem;color:var(--muted)">PO: ${ord}${recv>0?' · Received: '+recv:''}</div>
         </div>
-        ${ord>0?`<div style="background:var(--border);border-radius:3px;height:4px;margin-bottom:.5rem">
-          <div style="width:${Math.min(pct,100)}%;height:4px;border-radius:3px;background:${pctColor}"></div>
-        </div>`:''}
         <div style="display:flex;align-items:center;gap:.5rem">
-          <div style="font-size:.68rem;color:var(--muted);white-space:nowrap">${_lang==='bm'?'Terima':'Receive'} (${mat.unit||''})</div>
-          <input id="po-recv-qty-${it.id}" type="number" step="any" min="0" value="${rem}" style="${INP}">
+          <div style="font-size:.68rem;color:var(--muted);white-space:nowrap;flex-shrink:0">Receive</div>
+          <input id="po-recv-qty-${idx}" type="number" step="any" min="0" value="${rem}" style="${INP};flex:1" oninput="window._simpleRecvUnconfirm(${idx})">
+          <button id="po-recv-confirm-${idx}" onclick="window._simpleRecvConfirmItem(${idx},${poDetails.length})"
+            style="padding:.45rem .9rem;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;background:${alreadyRecv?'var(--green)':'var(--orange)'};color:#fff;transition:.2s">
+            ${alreadyRecv?'✅ Done':'Confirm'}
+          </button>
         </div>
       </div>`;
     }).join('');
+
+  // Restore visual state for previously confirmed items
+  const totalItems = poDetails.length;
+  Object.keys(window._simpleRecvConfirmed).forEach(function(idx) {
+    const qty  = window._simpleRecvConfirmed[idx];
+    const card = document.getElementById('po-recv-card-' + idx);
+    const btn  = document.getElementById('po-recv-confirm-' + idx);
+    const inp  = document.getElementById('po-recv-qty-' + idx);
+    if (card) card.style.borderColor = 'var(--green)';
+    if (btn)  { btn.textContent = '✅ Done'; btn.style.background = 'var(--green)'; btn.style.color = '#fff'; }
+    if (inp)  inp.value = qty;
+  });
+  // Re-check if all confirmed
+  if (Object.keys(window._simpleRecvConfirmed).length >= totalItems) {
+    const mb = document.getElementById('po-recv-btn');
+    if (mb) { mb.disabled = false; mb.style.opacity = '1'; mb.style.cursor = 'pointer'; }
+  }
 }
+
+window._simpleRecvConfirmItem = function(idx, total) {
+  const inp = document.getElementById('po-recv-qty-' + idx);
+  const qty = parseFloat(inp?.value) || 0;
+  const card = document.getElementById('po-recv-card-' + idx);
+  const btn  = document.getElementById('po-recv-confirm-' + idx);
+  if (qty < 0) return;
+
+  window._simpleRecvConfirmed[idx] = qty;
+  if (card) card.style.borderColor = 'var(--green)';
+  if (btn)  { btn.textContent = '✅ Done'; btn.style.background = 'var(--green)'; btn.style.color = '#fff'; }
+
+  // Enable main receive button when all items confirmed
+  const confirmedCount = Object.keys(window._simpleRecvConfirmed).length;
+  if (confirmedCount >= total) {
+    const mainBtn = document.getElementById('po-recv-btn');
+    if (mainBtn) { mainBtn.disabled = false; mainBtn.style.opacity = '1'; mainBtn.style.cursor = 'pointer'; }
+  }
+};
+
+window._simpleRecvUnconfirm = function(idx) {
+  delete window._simpleRecvConfirmed[idx];
+  const card = document.getElementById('po-recv-card-' + idx);
+  const btn  = document.getElementById('po-recv-confirm-' + idx);
+  if (card) card.style.borderColor = 'var(--border)';
+  if (btn)  { btn.textContent = 'Confirm'; btn.style.background = 'var(--orange)'; btn.style.color = '#fff'; }
+  const mainBtn = document.getElementById('po-recv-btn');
+  if (mainBtn) { mainBtn.disabled = true; mainBtn.style.opacity = '0.35'; mainBtn.style.cursor = 'not-allowed'; }
+};
 
 async function confirmPOReceive(poId, poNo) {
   const errEl = document.getElementById('po-recv-err');
@@ -1178,7 +1258,57 @@ async function confirmPOReceive(poId, poNo) {
       return;
     }
 
-    // ── REGULAR PO CONFIRM ───────────────────────
+    // ── REGULAR PO CONFIRM (details JSON based) ────
+    if (el.dataset.isSimple === 'true') {
+      const rows2 = el.querySelectorAll('[data-idx]');
+      let anyReceived = false;
+      const newRecvDetails = {};
+
+      // Load existing received_details first
+      const { data: curPO } = await sb.from('raw_material_po').select('details, received_details').eq('id', poId).single();
+      const poDetails = curPO?.details ? (typeof curPO.details === 'string' ? JSON.parse(curPO.details) : curPO.details) : [];
+      const existingRecv = curPO?.received_details ? (typeof curPO.received_details === 'string' ? JSON.parse(curPO.received_details) : curPO.received_details) : {};
+
+      rows2.forEach(function(row) {
+        const idx = row.dataset.idx;
+        const qty = parseFloat((window._simpleRecvConfirmed || {})[idx] ?? document.getElementById('po-recv-qty-' + idx)?.value) || 0;
+        const prev = parseFloat(existingRecv[idx] || 0);
+        newRecvDetails[idx] = prev + qty;
+        if (qty > 0) anyReceived = true;
+      });
+
+      if (!anyReceived) {
+        errEl.textContent = _lang==='bm'?'Tiada kuantiti dimasukkan.':'No quantity entered.';
+        errEl.style.display = 'block';
+        btn.disabled = false; btn.textContent = '✅ Sahkan Terima PO';
+        return;
+      }
+
+      const allDone = poDetails.every(function(it, idx) {
+        const ord  = parseFloat(it.meter || it.qty || 0);
+        const recv = parseFloat(newRecvDetails[idx] || 0);
+        return recv > 0;
+      });
+
+      // Try with received_details, fallback without if column doesn't exist
+      const updatePayload = { status: allDone ? 'Received' : 'Partially Received', received_details: JSON.stringify(newRecvDetails) };
+      let { error: upErr } = await sb.from('raw_material_po').update(updatePayload).eq('id', poId);
+      if (upErr) {
+        // Column may not exist yet — update status only
+        const { error: upErr2 } = await sb.from('raw_material_po').update({ status: allDone ? 'Received' : 'Partially Received' }).eq('id', poId);
+        if (upErr2) throw upErr2;
+      }
+
+      // Clear saved state for this PO
+      if (window._simpleRecvConfirmedByPO) delete window._simpleRecvConfirmedByPO[poId];
+      window._simpleRecvConfirmed = {};
+      closeModal();
+      toast('✅ ' + (_lang==='bm'?'Penerimaan PO berjaya!':'PO receive successful!'));
+      loadPOList();
+      return;
+    }
+
+    // ── REGULAR PO CONFIRM (raw_material_po_items based — legacy) ────
     const rows2 = el.querySelectorAll('[data-item-id]');
     let anyReceived = false;
 
@@ -1186,7 +1316,6 @@ async function confirmPOReceive(poId, poNo) {
       const itemId = row.dataset.itemId;
       const matId  = row.dataset.matId;
       const stock  = parseFloat(row.dataset.stock) || 0;
-      const unit   = row.dataset.unit;
       const inp    = document.getElementById('po-recv-qty-' + itemId);
       if (!inp) continue;
       const qty = parseFloat(inp.value) || 0;
