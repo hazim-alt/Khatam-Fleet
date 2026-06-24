@@ -1083,24 +1083,21 @@ async function openPOReceiveForm(poId, poNo, supplier, status) {
       const ord  = it.qty_ordered  || 0;
       const recv = it.qty_received || 0;
       const rem  = Math.max(0, ord - recv);
-      const pct  = ord ? Math.min(100, Math.round(recv/ord*100)) : 0;
-      const done = rem <= 0;
+      const pct  = ord ? Math.round(recv/ord*100) : 0;
+      const pctColor = pct >= 100 ? 'var(--green)' : pct > 0 ? 'var(--orange)' : 'var(--border)';
       return `<div data-item-id="${it.id}" data-mat-id="${mat.id||''}" data-mat-name="${mat.name||'—'}" data-unit="${mat.unit||''}" data-stock="${mat.current_stock||0}"
-        style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.75rem .9rem;margin-bottom:.55rem;opacity:${done?'.45':'1'}">
+        style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.75rem .9rem;margin-bottom:.55rem">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem">
           <div style="font-size:.85rem;font-weight:700">${mat.name||'—'}</div>
-          <div style="font-size:.65rem;color:var(--muted)">${recv}/${ord} ${mat.unit||''}</div>
+          <div style="font-size:.65rem;color:var(--muted)">PO: ${ord} ${mat.unit||''}${recv>0?' · Received: '+recv:''}${rem>0?' · Remaining: '+rem:''}</div>
         </div>
-        <div style="background:var(--border);border-radius:3px;height:4px;margin-bottom:.5rem">
-          <div style="width:${pct}%;height:4px;border-radius:3px;background:${done?'var(--green)':'var(--orange)'}"></div>
+        ${ord>0?`<div style="background:var(--border);border-radius:3px;height:4px;margin-bottom:.5rem">
+          <div style="width:${Math.min(pct,100)}%;height:4px;border-radius:3px;background:${pctColor}"></div>
+        </div>`:''}
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <div style="font-size:.68rem;color:var(--muted);white-space:nowrap">${_lang==='bm'?'Terima':'Receive'} (${mat.unit||''})</div>
+          <input id="po-recv-qty-${it.id}" type="number" step="any" min="0" value="${rem}" style="${INP}">
         </div>
-        ${done
-          ? '<div style="font-size:.7rem;color:var(--green);text-align:center">✅ Sudah lengkap</div>'
-          : `<div style="display:flex;align-items:center;gap:.5rem">
-              <div style="font-size:.68rem;color:var(--muted);white-space:nowrap">${_lang==='bm'?'Terima':'Receive'} (${mat.unit||''})</div>
-              <input id="po-recv-qty-${it.id}" type="number" step="any" min="0" max="${rem}" value="${rem}" style="${INP}">
-            </div>`
-        }
       </div>`;
     }).join('');
 }
@@ -1213,7 +1210,7 @@ async function confirmPOReceive(poId, poNo) {
     }
 
     const { data: allItems } = await sb.from('raw_material_po_items').select('qty_ordered, qty_received').eq('po_id', poId);
-    const allDone = (allItems||[]).every(it => (it.qty_received||0) >= it.qty_ordered);
+    const allDone = (allItems||[]).every(it => (it.qty_received||0) > 0);
     await sb.from('raw_material_po').update({ status: allDone ? 'Received' : 'Partially Received' }).eq('id', poId);
 
     closeModal();
