@@ -262,6 +262,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 
   <div id="scan-footer">
     <button class="btn-depart" id="depart-btn" onclick="doDepart()" disabled data-t="departBtn">🚀 Selesai &amp; Mula Perjalanan</button>
+    <button class="action-btn btn-arrived" id="fabric-arrived-btn" onclick="doFabricArrivedFromScan()" style="display:none;margin-top:.25rem">✅ Mark as Arrived</button>
     <button class="btn-secondary" onclick="closeScan()" data-t="backBtn">‹ Kembali</button>
   </div>
 </div>
@@ -497,6 +498,38 @@ async function loadTrip() {
     });
   }
 
+  // For rawmat DOs (leg 1, DO-YYYYMMDD-NNN format): load carton count from notes + roll count from reason JSON
+  var rawmatDOTrips = _allTrips.filter(function(t){ return t.leg === 1 && /^DO-\d{8}-\d{3}$/.test(t.do_no || ''); });
+  if (rawmatDOTrips.length) {
+    var rawmatReqNos = rawmatDOTrips.map(function(t){ return (t.do_no||'').replace(/^DO-/, 'REQ-'); });
+    // Fetch non-fabric (rawmat) and fabric roll requests for these REQ numbers
+    var [rawmatRes, fabricRollRes] = await Promise.all([
+      sb.from('production_material_requests').select('order_ref, notes, qty_issued, qty_requested').in('order_ref', rawmatReqNos),
+      sb.from('production_material_requests').select('order_ref, reason').in('order_ref', rawmatReqNos.map(function(r){ return 'FABRIC|' + r; }))
+    ]);
+    var rawmatNoteMap = {};
+    (rawmatRes.data || []).forEach(function(r){ rawmatNoteMap[r.order_ref] = r.notes || ''; });
+    var fabricRollMap = {};
+    (fabricRollRes.data || []).forEach(function(r) {
+      var reqNo = r.order_ref.replace('FABRIC|', '');
+      var rolls = 0;
+      try {
+        var obj = typeof r.reason === 'string' ? JSON.parse(r.reason) : (r.reason || {});
+        if (Array.isArray(obj.items)) rolls = obj.items.reduce(function(s,it){ return s + (parseInt(it.rolls)||0); }, 0);
+      } catch(e) {}
+      fabricRollMap[reqNo] = (fabricRollMap[reqNo] || 0) + rolls;
+    });
+    rawmatDOTrips.forEach(function(t) {
+      var reqNo = (t.do_no||'').replace(/^DO-/, 'REQ-');
+      var notes = rawmatNoteMap[reqNo] || '';
+      var m = notes.match(/\|\|CARTON:(\d+)/);
+      t._rawmatCartonCount = m ? parseInt(m[1]) : 0;
+      t._fabricRollCount   = fabricRollMap[reqNo] || 0;
+      // Mark as fabric if rolls found
+      if (t._fabricRollCount > 0) t._isFabricDO = true;
+    });
+  }
+
   // For fabric DO trips (Departed), load scan count + expected total from DB
   var fabricDOTrips = _allTrips.filter(function(t){ return t._isFabricDO && t.status === 'Departed'; });
   if (fabricDOTrips.length) {
@@ -611,7 +644,9 @@ function renderTrip(showBack) {
   if (_trip.status === 'Assigned') {
     const scanBtn = document.createElement('button');
     scanBtn.className = 'action-btn btn-scan';
-    scanBtn.textContent = t('startScan');
+    scanBtn.textContent = _currentTab === 'delivery'
+      ? (_lang === 'ms' ? '📦 Mula Scan Carton Delivery' : '📦 Start Carton Scan (Delivery)')
+      : t('startScan');
     scanBtn.addEventListener('click', openScan);
     content.appendChild(scanBtn);
   } else if (_trip.status === 'Departed') {
@@ -634,7 +669,7 @@ function renderTrip(showBack) {
           const fabArrBtn = document.createElement('button');
           fabArrBtn.className = 'action-btn btn-arrived';
           fabArrBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
-          fabArrBtn.textContent = '✅ Arrived';
+          fabArrBtn.textContent = '📍 Mark as Arrived';
           fabArrBtn.addEventListener('click', doFabricArrived);
           content.appendChild(fabArrBtn);
         } else {
@@ -742,14 +777,42 @@ async function loadScanCount(card) {
   const scanned = scanRes.count || 0;
 
   let expected = 0;
-  if (_trip.do_no) {
-    // Count all cartons for this DO
-    const { count: cntByDo } = await sb.from('cartons').select('id', { count: 'exact', head: true }).eq('do_no', _trip.do_no);
+  let expectedRolls = 0; // fabric rolls
+  const doNo = _trip.do_no || '';
+  const isRawmatDO = /^DO-\d{8}-\d{3}$/.test(doNo);
+
+  if (doNo) {
+    // Count cartons by do_no
+    const { count: cntByDo } = await sb.from('cartons').select('id', { count: 'exact', head: true }).eq('do_no', doNo);
     if (cntByDo > 0) {
       expected = cntByDo;
+    } else if (isRawmatDO) {
+      // Rawmat: cartons registered with batch_no = REQ-...
+      const reqNo = doNo.replace(/^DO-/, 'REQ-');
+      const fabricOrderRef = 'FABRIC|' + reqNo;
+      const [batchRes, rawmatNotesRes, fabricReasonRes] = await Promise.all([
+        sb.from('cartons').select('id', { count: 'exact', head: true }).eq('batch_no', reqNo),
+        sb.from('production_material_requests').select('notes').eq('order_ref', reqNo).limit(10),
+        sb.from('production_material_requests').select('reason').eq('order_ref', fabricOrderRef).limit(10)
+      ]);
+      if (batchRes.count > 0) expected = batchRes.count;
+      // Carton count from rawmat notes
+      if (!expected) {
+        (rawmatNotesRes.data || []).forEach(function(r) {
+          var nm = (r.notes || '').match(/\|\|CARTON:(\d+)/);
+          if (nm) expected = Math.max(expected, parseInt(nm[1]));
+        });
+      }
+      // Fabric roll count from reason JSON
+      (fabricReasonRes.data || []).forEach(function(r) {
+        try {
+          var obj = typeof r.reason === 'string' ? JSON.parse(r.reason) : (r.reason || {});
+          if (Array.isArray(obj.items)) expectedRolls += obj.items.reduce(function(s,it){ return s + (parseInt(it.rolls)||0); }, 0);
+        } catch(e) {}
+      });
     } else {
-      // Fallback: get all batch_nos from stock_requests, count cartons by batch
-      const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', _trip.do_no);
+      // Boutique DO: fallback via stock_requests batch_no
+      const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', doNo);
       const bkeys = (sr || []).map(r => r.batch_no || r.request_no).filter(Boolean);
       if (bkeys.length) {
         const { count: cntByBatch } = await sb.from('cartons').select('id', { count: 'exact', head: true }).in('batch_no', bkeys);
@@ -762,9 +825,12 @@ async function loadScanCount(card) {
   el.style.cssText = 'margin-top:.4rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap';
 
   const expBadge = document.createElement('span');
-  if (expected > 0) {
+  if (expectedRolls > 0) {
+    expBadge.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:#f59e0b20;border:1px solid #f59e0b;color:#f59e0b';
+    expBadge.textContent = '🧵 ' + expectedRolls + ' roll(s)';
+  } else if (expected > 0) {
     expBadge.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:#6366f120;border:1px solid var(--accent);color:var(--accent)';
-    expBadge.textContent = '📦 ' + expected + ' carton(s) expected';
+    expBadge.textContent = '📦 ' + expected + ' carton(s)';
   } else {
     expBadge.style.cssText = 'font-size:.72rem;font-weight:600;padding:.15rem .55rem;border-radius:20px;background:#33415520;border:1px solid var(--border);color:var(--muted)';
     expBadge.textContent = '📦 No cartons registered';
@@ -784,22 +850,74 @@ async function loadScanCount(card) {
 
 async function loadDeliveryCartonBadge(card) {
   if (!_trip || !_trip.do_no) return;
-  const [scanRes, cartonRes] = await Promise.all([
-    sb.from('carton_scans').select('id', { count: 'exact', head: true }).eq('trip_id', _trip.id),
-    sb.from('cartons').select('id', { count: 'exact', head: true }).eq('do_no', _trip.do_no)
-  ]);
-  const scanned = scanRes.count || 0;
-  const expected = cartonRes.count || 0;
-  if (scanned < 1 && expected < 1) return;
+  const doNo = _trip.do_no;
+  const isRawmatDO = /^DO-\d{8}-\d{3}$/.test(doNo);
+
+  // For fabric DO: get total rolls (already in _trip._fabricTotalRolls from loadTrip, or fetch now)
+  let totalRolls = _trip._fabricTotalRolls || _trip._fabricRollCount || 0;
+  if (!totalRolls && _trip._isFabricDO) {
+    const refSuffix = doNo.replace(/^DO-\d{8}-/, '');
+    const reqRes = await sb.from('production_material_requests').select('id, reason').eq('order_ref', 'FABRIC|' + refSuffix).eq('status', 'Issued').limit(10);
+    (reqRes.data || []).forEach(function(r) {
+      try {
+        var obj = typeof r.reason === 'string' ? JSON.parse(r.reason) : (r.reason || {});
+        if (Array.isArray(obj.items)) totalRolls += obj.items.reduce(function(s,it){ return s + (parseInt(it.rolls)||0); }, 0);
+      } catch(e) {}
+    });
+  }
+
+  // For rawmat DO: get registered carton barcodes + count
+  let totalCartons = 0;
+  let validCartonBarcodes = null; // set for rawmat cross-check
+  if (isRawmatDO) {
+    const reqNo = doNo.replace(/^DO-/, 'REQ-');
+    const [byDo, byBatch, notesRes] = await Promise.all([
+      sb.from('cartons').select('barcode').eq('do_no', doNo),
+      sb.from('cartons').select('barcode').eq('batch_no', reqNo),
+      sb.from('production_material_requests').select('notes').eq('order_ref', reqNo).limit(5)
+    ]);
+    const regList = (byDo.data && byDo.data.length) ? byDo.data : (byBatch.data || []);
+    if (regList.length) {
+      validCartonBarcodes = new Set(regList.map(function(c){ return c.barcode; }));
+      totalCartons = regList.length;
+    }
+    if (!totalCartons) {
+      (notesRes.data || []).forEach(function(r) {
+        var m = (r.notes || '').match(/\|\|CARTON:(\d+)/);
+        if (m) totalCartons = Math.max(totalCartons, parseInt(m[1]));
+      });
+    }
+  }
+
+  // Fetch scan barcodes to cross-check for rawmat; count for others
+  let scanned = 0;
+  if (validCartonBarcodes) {
+    const scanData = await sb.from('carton_scans').select('barcode').eq('trip_id', _trip.id);
+    scanned = (scanData.data || []).filter(function(s){ return validCartonBarcodes.has(s.barcode); }).length;
+  } else {
+    const scanRes = await sb.from('carton_scans').select('id', { count: 'exact', head: true }).eq('trip_id', _trip.id);
+    scanned = scanRes.count || 0;
+  }
+
+  if (scanned < 1 && totalRolls < 1 && totalCartons < 1) return;
+
   const el = document.createElement('div');
   el.style.cssText = 'margin-top:.4rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap';
-  if (scanned > 0) {
-    const color = expected > 0 ? (scanned >= expected ? '#10b981' : '#f59e0b') : '#3b82f6';
+
+  if (totalRolls > 0) {
+    const color = scanned > 0 ? (scanned >= totalRolls ? '#10b981' : '#f59e0b') : '#f59e0b';
     const b = document.createElement('span');
     b.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:' + color + '20;border:1px solid ' + color + ';color:' + color;
-    b.textContent = '📦 ' + scanned + (expected > 0 ? '/' + expected : '') + (_trip._isFabricDO ? ' roll(s) scanned' : ' carton(s) delivered');
+    b.textContent = '🧵 ' + (scanned > 0 ? scanned + '/' : '') + totalRolls + ' roll(s)';
+    el.appendChild(b);
+  } else if (totalCartons > 0 || scanned > 0) {
+    const color = scanned >= totalCartons && totalCartons > 0 ? '#10b981' : '#6366f1';
+    const b = document.createElement('span');
+    b.style.cssText = 'font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;background:' + color + '20;border:1px solid ' + color + ';color:' + color;
+    b.textContent = '📦 ' + (scanned > 0 ? scanned + '/' : '') + totalCartons + ' carton(s)';
     el.appendChild(b);
   }
+
   card.appendChild(el);
 }
 
@@ -832,19 +950,28 @@ async function openScan() {
       });
     }
   } else {
-    // Boutique: fetch from cartons table
+    // Boutique / rawmat: fetch from cartons table
     let regData = [];
     if (_trip.do_no) {
-      const { data: byDo } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').eq('do_no', _trip.do_no).order('carton_no');
+      const doNo = _trip.do_no;
+      const isRawmatDO = /^DO-\d{8}-\d{3}$/.test(doNo);
+
+      // Always try by do_no first
+      const { data: byDo } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').eq('do_no', doNo).order('carton_no');
       regData = byDo || [];
-      const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', _trip.do_no);
-      const bkeys = (sr || []).map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
-      if (bkeys.length) {
-        const { data: byBatch } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').in('batch_no', bkeys).order('carton_no');
-        if (byBatch && byBatch.length) {
-          const existingIds = new Set(regData.map(function(c){ return c.id; }));
-          (byBatch || []).forEach(function(c){ if (!existingIds.has(c.id)) regData.push(c); });
-          regData.sort(function(a,b){ return a.carton_no - b.carton_no; });
+
+      if (!regData.length && isRawmatDO) {
+        // Rawmat: cartons registered with batch_no = REQ-...
+        const reqNo = doNo.replace(/^DO-/, 'REQ-');
+        const { data: byBatch } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').eq('batch_no', reqNo).order('carton_no');
+        if (byBatch && byBatch.length) regData = byBatch;
+      } else if (!regData.length) {
+        // Boutique: fallback via stock_requests batch_no
+        const { data: sr } = await sb.from('stock_requests').select('batch_no, request_no').eq('do_no', doNo);
+        const bkeys = (sr || []).map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
+        if (bkeys.length) {
+          const { data: byBatch } = await sb.from('cartons').select('id, barcode, carton_no, total_cartons').in('batch_no', bkeys).order('carton_no');
+          if (byBatch && byBatch.length) regData = byBatch;
         }
       }
     }
@@ -852,9 +979,12 @@ async function openScan() {
   }
 
   document.getElementById('scan-do').textContent = _trip.do_no || '';
-  // Hide depart button for fabric DO delivery (already departed)
+  document.getElementById('scan-title').textContent = _currentTab === 'delivery'
+    ? (_lang === 'ms' ? 'Scan Carton Delivery' : 'Carton Delivery Scan')
+    : t('scanTitle');
+  // Hide depart button only for fabric DO in delivery phase (already departed); show during pickup
   const departBtn = document.getElementById('depart-btn');
-  if (departBtn) departBtn.style.display = _trip._isFabricDO ? 'none' : '';
+  if (departBtn) departBtn.style.display = (_trip._isFabricDO && _currentTab === 'delivery') ? 'none' : '';
   showScreen('screen-scan');
   renderScanList();
   updateScanCount();
@@ -987,8 +1117,14 @@ async function processBarcode(barcode) {
 
   // If DO is set, also check barcode belongs to this trip's DO
   let wrongDO = false;
-  if (isValid && _trip.do_no && regCarton[0].do_no && regCarton[0].do_no !== _trip.do_no) {
-    wrongDO = true;
+  if (isValid && _trip.do_no) {
+    const c = regCarton[0];
+    const tripReqNo = _trip.do_no.replace(/^DO-/, 'REQ-');
+    if (c.do_no && c.do_no !== _trip.do_no) {
+      wrongDO = true; // do_no mismatch
+    } else if (!c.do_no && c.batch_no && c.batch_no !== tripReqNo) {
+      wrongDO = true; // rawmat: batch_no (REQ-...) mismatch
+    }
   }
 
   if (!isValid) {
@@ -1050,8 +1186,21 @@ function flashDuplicate(barcode) {
 
 function updateScanCount() {
   document.getElementById('scan-count').textContent = _scans.length;
-  const btn = document.getElementById('depart-btn');
-  btn.disabled = false; // allow depart even with 0 scans (with confirmation)
+  const isFabric = _trip && _trip._isFabricDO;
+  const isDeliveryPhase = _currentTab === 'delivery';
+  const departBtn = document.getElementById('depart-btn');
+  const fabricArrivedBtn = document.getElementById('fabric-arrived-btn');
+  if (isFabric && isDeliveryPhase) {
+    // Delivery phase: hide depart, show arrived when all scanned
+    departBtn.style.display = 'none';
+    const allScanned = _regCartons.length > 0 && _scans.length >= _regCartons.length;
+    fabricArrivedBtn.style.display = allScanned ? '' : 'none';
+  } else {
+    // Pickup phase (or non-fabric): show depart button
+    departBtn.style.display = '';
+    departBtn.disabled = false;
+    fabricArrivedBtn.style.display = 'none';
+  }
 }
 
 function renderScanList() {
@@ -1253,7 +1402,7 @@ async function doDepart() {
   const msg = n === 0 ? t('confirmDepartZero') : t('confirmDepart', { n });
   if (!confirm(msg)) return;
   const btn = document.getElementById('depart-btn');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>' + t('loginLoading');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>' + t('departBtn');
   stopScanner();
   const { error } = await sb.from('fleet_trips').update({ status:'Departed', departure_time: new Date().toISOString() }).eq('id', _trip.id);
   if (error) { alert(error.message); btn.disabled = false; btn.textContent = t('departBtn'); return; }
@@ -1431,6 +1580,23 @@ async function doFabricArrivedForTrip(tripId) {
   await doFabricArrived();
 }
 
+// ── FABRIC DO: ARRIVED (from scan screen) ─────────
+async function doFabricArrivedFromScan() {
+  // Sync scan progress then close scan screen before marking arrived
+  if (_trip) {
+    _trip._fabricScannedCount = _scans.length;
+    _trip._fabricTotalRolls = _regCartons.length;
+    var allTripsEntry = (_allTrips || []).find(function(t){ return t.id === _trip.id; });
+    if (allTripsEntry) {
+      allTripsEntry._fabricScannedCount = _scans.length;
+      allTripsEntry._fabricTotalRolls = _regCartons.length;
+    }
+  }
+  stopScanner();
+  showScreen('screen-home');
+  await doFabricArrived();
+}
+
 // ── FABRIC DO: ARRIVED ────────────────────────────
 async function doFabricArrived() {
   if (!_trip) return;
@@ -1444,8 +1610,7 @@ async function doFabricArrived() {
   await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
   document.getElementById('trip-map-wrap').style.display = 'none';
   _trip.status = 'Arrived';
-  if (_currentTab === 'delivery') renderDeliveryList();
-  else renderTrip();
+  viewPOD(_trip.id);
 }
 
 // ═══════════════════════════════════════════════════
@@ -1454,6 +1619,8 @@ async function doFabricArrived() {
 let _deliveryTrips = [];
 let _dragSrcIdx = null;
 let _pollTimer = null;
+var _selectMode = false;
+var _selectedTripIds = [];
 
 let _pickupTrips = [];
 let _dragPickupSrcIdx = null;
@@ -1584,15 +1751,33 @@ function renderDeliveryList() {
     .sort(function(a,b){ return (a.driver_sequence||0) - (b.driver_sequence||0); });
 
   if (!_deliveryTrips.length) {
+    _selectMode = false; _selectedTripIds = [];
     content.innerHTML = '<div class="no-trip"><div class="icon">📦</div><div style="font-weight:700;margin-bottom:.4rem">No Active Deliveries</div><div style="font-size:.8rem">Please begin from the Pick Up tab.</div></div>';
     return;
   }
 
+  // Header: select toggle button
+  var selHeader = document.createElement('div');
+  selHeader.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:.5rem;padding:0 .25rem';
+  selHeader.innerHTML = '<button id="select-mode-btn" onclick="toggleSelectMode()" style="font-size:.75rem;padding:.3rem .75rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">'
+    + (_selectMode ? '✕ Cancel' : '☑ Select') + '</button>';
+  content.appendChild(selHeader);
+
   const list = document.createElement('div');
   list.className = 'delivery-list'; list.id = 'delivery-list-el';
+  list.style.paddingBottom = _selectMode ? '5rem' : '';
   _deliveryTrips.forEach(function(trip, idx){ list.appendChild(buildDeliveryItem(trip, idx)); });
   content.appendChild(list);
-  initDragDrop();
+
+  // Floating bottom bar for multi-select action
+  var selectBar = document.createElement('div');
+  selectBar.id = 'select-bar';
+  selectBar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;padding:.75rem 1rem;background:var(--card);border-top:1px solid var(--border);display:' + (_selectMode && _selectedTripIds.length ? 'flex' : 'none') + ';align-items:center;justify-content:space-between;z-index:200;box-shadow:0 -4px 12px rgba(0,0,0,.3)';
+  selectBar.innerHTML = '<span id="select-count" style="font-size:.85rem;color:var(--muted)">' + _selectedTripIds.length + ' DO dipilih</span>'
+    + '<button id="select-action-btn" onclick="markArrivedMulti()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:.6rem 1.2rem;font-size:.85rem;font-weight:700;cursor:pointer">📍 Mark as Arrived</button>';
+  content.appendChild(selectBar);
+
+  if (!_selectMode) initDragDrop();
   pollDeliveryStatus();
 }
 
@@ -1703,11 +1888,14 @@ function buildDeliveryItem(trip, idx) {
   const isArrived = trip.status === 'Arrived';
   const isPOD     = !!trip.pod_confirmed_at;
 
+  const isSelected = _selectedTripIds.indexOf(trip.id) !== -1;
+
   const item = document.createElement('div');
   item.className = 'delivery-item';
   item.setAttribute('data-trip-id', trip.id);
   item.setAttribute('data-idx', idx);
-  item.draggable = !isArrived;
+  item.draggable = !isArrived && !_selectMode;
+  if (_selectMode && isSelected) item.style.borderColor = '#10b981';
 
   let statusText = '🚚 In Transit';
   let actionHTML;
@@ -1717,7 +1905,7 @@ function buildDeliveryItem(trip, idx) {
       const allFabricScanned = trip._fabricTotalRolls > 0 && trip._fabricScannedCount >= trip._fabricTotalRolls;
       if (allFabricScanned) {
         actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
-          + '<button class="btn-arrived-sm" style="background:#10b981" onclick="doFabricArrivedForTrip(\'' + trip.id + '\')">✅ Arrived</button>'
+          + '<button class="btn-arrived-sm" style="background:#10b981" onclick="doFabricArrivedForTrip(\'' + trip.id + '\')">📍 Mark as Arrived</button>'
           + '</div>';
       } else {
         actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
@@ -1753,9 +1941,17 @@ function buildDeliveryItem(trip, idx) {
     }
   }
 
+  const rollBadge   = (trip._fabricRollCount   > 0) ? '<span style="font-size:.68rem;font-weight:700;color:#f59e0b;margin-right:.35rem">🧵 ' + trip._fabricRollCount + ' roll</span>' : '';
+  const cartonBadge = (trip._rawmatCartonCount > 0) ? '<span style="font-size:.68rem;font-weight:700;color:#6366f1">📦 ' + trip._rawmatCartonCount + ' carton</span>' : '';
+  const countBadges = (rollBadge || cartonBadge) ? '<div style="margin-top:.2rem">' + rollBadge + cartonBadge + '</div>' : '';
+
+  const checkboxHTML = _selectMode
+    ? '<span class="trip-checkbox" onclick="event.stopPropagation();toggleTripSelect(\'' + trip.id + '\')" style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (isSelected ? '#10b981' : 'var(--border)') + ';background:' + (isSelected ? '#10b981' : 'transparent') + ';display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:.75rem;font-weight:700;color:#fff">' + (isSelected ? '✓' : '') + '</span>'
+    : (isArrived ? '<span style="font-size:1.1rem;color:var(--border)">⠿</span>' : '<span class="drag-handle">⠿</span>');
+
   item.innerHTML =
     '<div class="delivery-item-header">'
-    + (isArrived ? '<span style="font-size:1.1rem;color:var(--border)">⠿</span>' : '<span class="drag-handle">⠿</span>')
+    + checkboxHTML
     + '<span class="seq-num">' + (idx + 1) + '</span>'
     + '<span class="delivery-do">' + (trip.do_no || '—') + '</span>'
     + (!isArrived ? '<span class="delivery-eta">ETA ' + etaStr + '</span>' : '')
@@ -1764,12 +1960,19 @@ function buildDeliveryItem(trip, idx) {
       + (trip.leg === 1 ? '<span style="font-size:.65rem;color:#10b981;font-weight:600">📦 DELIVER TO: </span>' : '')
       + (trip.leg === 1 ? (trip._destBoutique || trip.destination || '—') : (trip.destination || '—'))
       + '</div>'
+    + countBadges
     + '<div class="delivery-status">' + statusText + '</div>'
-    + '<div class="delivery-actions">' + actionHTML + '</div>';
+    + (!_selectMode ? '<div class="delivery-actions">' + actionHTML + '</div>' : '');
 
-  // Click card body (not the button) to open detail view — allow for Arrived (awaiting POD) too
-  if (!isPOD) {
-    item.style.cursor = 'pointer';
+  item.style.cursor = 'pointer';
+  if (_selectMode) {
+    // In select mode — tap card = toggle selection
+    item.addEventListener('click', function(e) {
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+      toggleTripSelect(trip.id);
+    });
+  } else if (!isPOD) {
+    // Normal mode — tap card = open detail
     item.addEventListener('click', function(e) {
       if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
       openTripDetail(trip.id);
@@ -1901,8 +2104,112 @@ async function markArrived(tripId) {
       await Promise.all(reqs.map(function(r){ return sb.from('request_status_log').insert({ request_id: r.id, status: 'Arrived', note: logNote, changed_by: _driver ? _driver.name : '' }); }));
     }
   }
+  if (t && t.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', t.vehicle_id);
+  if (_driver) await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
   if (t) t.status = 'Arrived';
+  viewPOD(tripId);
+}
+
+// ── MULTI-SELECT HELPERS ──────────────────────────
+function toggleSelectMode() {
+  _selectMode = !_selectMode;
+  _selectedTripIds = [];
   renderDeliveryList();
+}
+
+function toggleTripSelect(tripId) {
+  var idx = _selectedTripIds.indexOf(tripId);
+  if (idx === -1) _selectedTripIds.push(tripId);
+  else _selectedTripIds.splice(idx, 1);
+  // Update card border + checkbox without full re-render
+  document.querySelectorAll('.delivery-item').forEach(function(item) {
+    var id = item.getAttribute('data-trip-id');
+    var sel = _selectedTripIds.indexOf(id) !== -1;
+    item.style.borderColor = sel ? '#10b981' : '';
+    var cb = item.querySelector('.trip-checkbox');
+    if (cb) {
+      cb.style.borderColor = sel ? '#10b981' : 'var(--border)';
+      cb.style.background = sel ? '#10b981' : 'transparent';
+      cb.textContent = sel ? '✓' : '';
+    }
+  });
+  var bar = document.getElementById('select-bar');
+  var countEl = document.getElementById('select-count');
+  var actionBtn = document.getElementById('select-action-btn');
+  if (bar) bar.style.display = _selectedTripIds.length ? 'flex' : 'none';
+  if (countEl) countEl.textContent = _selectedTripIds.length + ' DO dipilih';
+  if (actionBtn) {
+    var selTrips = _selectedTripIds.map(function(id){ return _allTrips.find(function(t){ return t.id === id; }); }).filter(Boolean);
+    var allArrived = selTrips.length && selTrips.every(function(t){ return t.status === 'Arrived'; });
+    actionBtn.textContent = allArrived ? '📋 Combined POD' : '📍 Mark as Arrived';
+  }
+}
+
+async function markArrivedMulti() {
+  if (!_selectedTripIds.length) return;
+  var trips = _selectedTripIds.map(function(id){ return _allTrips.find(function(t){ return t.id === id; }); }).filter(Boolean);
+  var toArrive = trips.filter(function(t){ return t.status !== 'Arrived'; });
+  var alreadyArrived = trips.filter(function(t){ return t.status === 'Arrived'; });
+  var actionLabel = toArrive.length ? 'Mark as Arrived & POD' : 'Combined POD';
+  if (!confirm(actionLabel + ' untuk ' + trips.length + ' DO?')) return;
+  if (toArrive.length) {
+    var now = new Date().toISOString();
+    // Mark un-arrived trips as Arrived
+    await Promise.all(toArrive.map(function(t){
+      return sb.from('fleet_trips').update({ status: 'Arrived', arrival_time: now }).eq('id', t.id);
+    }));
+    // Free vehicle + driver
+    var withVehicle = toArrive.find(function(t){ return t.vehicle_id; });
+    if (withVehicle) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', withVehicle.vehicle_id);
+    if (_driver) await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+    // Log arrivals
+    await Promise.all(toArrive.map(function(t){
+      if (!t.do_no) return Promise.resolve();
+      return sb.from('stock_requests').select('id').eq('do_no', t.do_no).then(function(res){
+        if (!res.data || !res.data.length) return;
+        var note = 'Driver arrived | Driver: ' + (_driver ? _driver.name : '') + ' | DO: ' + t.do_no;
+        return Promise.all(res.data.map(function(r){
+          return sb.from('request_status_log').insert({ request_id: r.id, status: 'Arrived', note: note, changed_by: _driver ? _driver.name : '' });
+        }));
+      });
+    }));
+    toArrive.forEach(function(t){ t.status = 'Arrived'; t.arrival_time = now; });
+  }
+  _selectMode = false;
+  _selectedTripIds = [];
+  // Open combined POD for all
+  viewCombinedPOD(trips.map(function(t){ return t.id; }));
+}
+
+async function viewCombinedPOD(tripIds) {
+  if (!tripIds || !tripIds.length) return;
+  if (tripIds.length === 1) { viewPOD(tripIds[0]); return; }
+  var { data: trips } = await sb.from('fleet_trips')
+    .select('id, do_no, destination, arrival_time, pod_confirmed_at, pod_confirmed_by, vehicle_id')
+    .in('id', tripIds);
+  if (!trips || !trips.length) return;
+  var doNums = trips.map(function(t){ return t.do_no || '—'; }).join(', ');
+  var dest = trips[0].destination || '—';
+  var latestArrival = trips.reduce(function(lat, t){
+    return (!lat || (t.arrival_time && new Date(t.arrival_time) > new Date(lat))) ? t.arrival_time : lat;
+  }, null);
+  var fmt = function(d){ return d ? new Date(d).toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'; };
+  document.getElementById('pod-details').innerHTML = [
+    ['DO No.', doNums],
+    ['To', dest],
+    ['Driver', _driver ? _driver.name : '—'],
+    ['Arrived', fmt(latestArrival)]
+  ].map(function(r){ return '<div class="pod-row"><span class="pod-label">' + r[0] + '</span><span class="pod-value">' + r[1] + '</span></div>'; }).join('');
+  document.getElementById('pod-cartons').style.display = 'none';
+  document.getElementById('pod-signature-card').style.display = 'none';
+  document.getElementById('pod-sub').textContent = doNums + ' — ' + dest;
+  document.getElementById('screen-pod').setAttribute('data-trip-id', tripIds[0]);
+  document.getElementById('screen-pod').setAttribute('data-combined-trip-ids', tripIds.join(','));
+  document.getElementById('btn-delivered').style.display = '';
+  clearPodPhoto();
+  document.getElementById('pod-photo-card').style.display = 'block';
+  document.getElementById('pod-photo-btn').style.display = '';
+  showScreen('screen-pod');
 }
 
 async function markDirectDelivery(tripId) {
@@ -2061,26 +2368,35 @@ function clearPodPhoto() {
   document.getElementById('pod-photo-btn').textContent = '📷 Ambil Gambar';
 }
 
-function closePOD() { clearPodPhoto(); showScreen('screen-home'); if (_currentTab === 'delivery') renderDeliveryList(); }
+function closePOD() { clearPodPhoto(); document.getElementById('screen-pod').removeAttribute('data-combined-trip-ids'); showScreen('screen-home'); if (_currentTab === 'delivery') renderDeliveryList(); }
 
 async function confirmDelivered() {
-  var tripId = document.getElementById('screen-pod').getAttribute('data-trip-id');
+  var podScreen = document.getElementById('screen-pod');
+  var tripId = podScreen.getAttribute('data-trip-id');
   if (!tripId) { alert('Tiada trip ID.'); return; }
+  var combinedStr = podScreen.getAttribute('data-combined-trip-ids');
+  var allTripIds = combinedStr ? combinedStr.split(',') : [tripId];
   var btn = document.getElementById('btn-delivered');
   btn.disabled = true; btn.textContent = '⏳ Menyimpan...';
 
   try {
-    var update = { status: 'Delivered', pod_confirmed_at: new Date().toISOString() };
-    // Save photo if taken — try pod_photo column (add via Supabase if not yet: ALTER TABLE fleet_trips ADD COLUMN pod_photo text;)
+    var now = new Date().toISOString();
+    var update = { status: 'Delivered', pod_confirmed_at: now };
     if (_podPhotoDataUrl) update.pod_photo = _podPhotoDataUrl;
-    var { error } = await sb.from('fleet_trips').update(update).eq('id', tripId);
+    // Update all trips (single or combined)
+    var { error } = await sb.from('fleet_trips').update(update).in('id', allTripIds);
     if (error) throw error;
-    // Mark stock_requests as Received
-    var { data: trip } = await sb.from('fleet_trips').select('do_no').eq('id', tripId).single();
-    if (trip && trip.do_no) {
-      await sb.from('stock_requests').update({ status: 'Received' }).eq('do_no', trip.do_no);
-      await sb.from('cartons').update({ status: 'delivered' }).eq('do_no', trip.do_no);
+    // Mark stock_requests + cartons for all DOs
+    var { data: tripRows } = await sb.from('fleet_trips').select('do_no').in('id', allTripIds);
+    if (tripRows) {
+      await Promise.all(tripRows.filter(function(t){ return t.do_no; }).map(function(t){
+        return Promise.all([
+          sb.from('stock_requests').update({ status: 'Received' }).eq('do_no', t.do_no),
+          sb.from('cartons').update({ status: 'delivered' }).eq('do_no', t.do_no)
+        ]);
+      }));
     }
+    podScreen.removeAttribute('data-combined-trip-ids');
     clearPodPhoto();
     showScreen('screen-home');
     loadTrip();
