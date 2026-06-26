@@ -61,12 +61,12 @@ body { background: #0a0f1e; color: var(--text); font-family: -apple-system, Blin
 .content-pad { padding: .9rem 1rem 1.5rem; }
 
 /* ─── MENU GRID ─────────────────────────────── */
-.menu-grid  { display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; gap: .75rem; height: 100%; }
-.menu-card  { background: var(--card); border: 1px solid var(--border); border-radius: 20px; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; padding: 1rem; transition: border-color .2s, background .2s; }
-.menu-card:active { background: #263249; border-color: var(--orange); transform: scale(.97); }
-.menu-icon  { font-size: 3rem; line-height: 1; }
+.menu-grid  { display: flex; flex-direction: column; gap: .65rem; }
+.menu-card  { background: var(--card); border: 1px solid var(--border); border-radius: 16px; cursor: pointer; display: flex; flex-direction: row; align-items: center; gap: .9rem; padding: .9rem 1.1rem; transition: border-color .2s, background .2s; text-align: left; }
+.menu-card:active { background: #263249; border-color: var(--orange); transform: scale(.98); }
+.menu-icon  { font-size: 2rem; line-height: 1; flex-shrink: 0; }
 .menu-label { font-size: .92rem; font-weight: 800; }
-.menu-desc  { font-size: .68rem; color: var(--muted); line-height: 1.5; padding: 0 .25rem; }
+.menu-desc  { font-size: .68rem; color: var(--muted); line-height: 1.4; margin-top: .1rem; }
 
 /* ─── CARDS ─────────────────────────────────── */
 .po-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: .9rem 1rem; margin-bottom: .65rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
@@ -217,29 +217,41 @@ body { background: #0a0f1e; color: var(--text); font-family: -apple-system, Blin
     </div>
   </div>
   <div class="main-screen" style="display:flex;flex-direction:column;">
-    <div class="content-pad" style="flex:1;display:flex;flex-direction:column;padding-bottom:1rem;">
+    <div class="content-pad" style="padding-bottom:1rem;">
       <div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem" data-i18n="select_fn">Pilih Fungsi</div>
-      <div class="menu-grid" style="flex:1;">
+      <div class="menu-grid">
 
         <div class="menu-card" onclick="goSection('receive')" style="position:relative">
           <div id="receive-badge" style="display:none;position:absolute;top:.5rem;right:.5rem;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:99px;padding:.15rem .45rem;min-width:1.2rem;text-align:center"></div>
           <div class="menu-icon">📦</div>
-          <div class="menu-label" data-i18n="receive_title">Receive Bahan</div>
-          <div class="menu-desc" id="receive-badge-desc" data-i18n="receive_desc">Terima PO & jana stiker QR</div>
+          <div><div class="menu-label" data-i18n="receive_title">Receive Bahan</div>
+          <div class="menu-desc" id="receive-badge-desc" data-i18n="receive_desc">Terima PO & jana stiker QR</div></div>
         </div>
 
         <div class="menu-card" onclick="goSection('pick')" style="position:relative">
           <div id="pick-badge-dot" style="display:none;position:absolute;top:.5rem;right:.5rem;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:99px;padding:.15rem .45rem;min-width:1.2rem;text-align:center"></div>
           <div class="menu-icon">📋</div>
-          <div class="menu-label" data-i18n="pick_title">Pick Request</div>
-          <div class="menu-desc" id="pick-badge-desc" data-i18n="pick_desc">Issue bahan ke production</div>
+          <div><div class="menu-label" data-i18n="pick_title">Pick Request</div>
+          <div class="menu-desc" id="pick-badge-desc" data-i18n="pick_desc">Issue bahan ke production</div></div>
         </div>
 
         <div class="menu-card" onclick="goSection('dispatch')" style="position:relative">
           <div id="dispatch-badge" style="display:none;position:absolute;top:.5rem;right:.5rem;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:99px;padding:.15rem .45rem;min-width:1.2rem;text-align:center"></div>
           <div class="menu-icon">🚐</div>
-          <div class="menu-label">Dispatch</div>
-          <div class="menu-desc" id="dispatch-badge-desc">Hantar DO ke fleet</div>
+          <div><div class="menu-label">Dispatch</div>
+          <div class="menu-desc" id="dispatch-badge-desc">Hantar DO ke fleet</div></div>
+        </div>
+
+        <div class="menu-card" onclick="goSection('history')">
+          <div class="menu-icon">📜</div>
+          <div><div class="menu-label">History</div>
+          <div class="menu-desc">Semak request lepas-lepas</div></div>
+        </div>
+
+        <div class="menu-card" onclick="goSection('stockcount')">
+          <div class="menu-icon">🔢</div>
+          <div><div class="menu-label">Stock Count</div>
+          <div class="menu-desc">Kira stok fizikal & hantar</div></div>
         </div>
 
       </div>
@@ -290,6 +302,38 @@ body { background: #0a0f1e; color: var(--text); font-family: -apple-system, Blin
   </div>
   <div class="screen-body">
     <div id="dispatch-list" style="padding:.75rem 0"></div>
+  </div>
+</div>
+
+<!-- ══════════ STOCK COUNT SCREEN ══════════ -->
+<div class="screen" id="screen-stockcount">
+  <div class="topbar">
+    <button class="btn-back" onclick="goHome()" style="font-size:1.3rem;margin-right:.5rem">‹</button>
+    <div class="topbar-title">🔢 Stock Count</div>
+    <div class="topbar-right">
+      <button class="btn-logout" onclick="loadStockCount()" style="font-size:.75rem">↻</button>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div id="sc-body" style="padding:.75rem"></div>
+  </div>
+</div>
+
+<!-- ══════════ HISTORY SCREEN ══════════ -->
+<div class="screen" id="screen-history">
+  <div class="topbar">
+    <button class="btn-back" onclick="goHome()" style="font-size:1.3rem;margin-right:.5rem">‹</button>
+    <div class="topbar-title">📜 History</div>
+    <div class="topbar-right">
+      <button class="btn-logout" onclick="loadHistory()" style="font-size:.75rem">↻</button>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div style="padding:.6rem .75rem">
+      <input id="history-search" type="text" placeholder="🔍 Cari REQ / DO / bahan..." oninput="filterHistory()"
+        style="width:100%;box-sizing:border-box;padding:.5rem .75rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.82rem;outline:none">
+    </div>
+    <div id="history-list" style="padding:.25rem .75rem .75rem"></div>
   </div>
 </div>
 
@@ -380,6 +424,8 @@ function goSection(section) {
   if (section === 'receive')  { goScreen('screen-receive');  loadPOList(); }
   if (section === 'pick')     { goScreen('screen-pick');     loadPickRequests(); }
   if (section === 'dispatch') { goScreen('screen-dispatch'); loadDispatchList(); }
+  if (section === 'history')    { goScreen('screen-history');    loadHistory(); }
+  if (section === 'stockcount') { goScreen('screen-stockcount'); loadStockCount(); }
 }
 
 async function loadDispatchList() {
@@ -394,22 +440,19 @@ async function loadDispatchList() {
     .like('order_ref', 'FABRIC|%')
     .order('reviewed_at', { ascending: false });
 
-  if (!reqs || !reqs.length) {
-    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.85rem">Tiada DO pending dispatch</div>';
-    return;
-  }
-
   // Compute DO numbers + check existing fleet trips
-  const withDo = reqs.map(function(r) {
+  const withDo = (reqs || []).map(function(r) {
     const date = r.reviewed_at ? new Date(r.reviewed_at) : new Date();
-    const refSuffix = (r.order_ref||'').replace('FABRIC|','').replace(/^—$/,'').trim() || r.id.slice(-4).toUpperCase();
+    const refSuffix = (r.order_ref||'').replace('FABRIC|','').replace(/^REQ-\d{8}-/, '').replace(/^—$/,'').trim() || r.id.slice(-4).toUpperCase();
     const doNo = 'DO-' + date.getFullYear() + ('0'+(date.getMonth()+1)).slice(-2) + ('0'+date.getDate()).slice(-2) + '-' + refSuffix;
     let info = {};
     try { info = JSON.parse(r.reason || '{}'); } catch(e) {}
     return { ...r, doNo, info };
   });
   const doNums = withDo.map(r => r.doNo);
-  const { data: trips } = await sb.from('fleet_trips').select('do_no, status, driver_id, driver:driver_id(name), vehicle:vehicle_id(plate_no)').in('do_no', doNums);
+  const { data: trips } = doNums.length
+    ? await sb.from('fleet_trips').select('do_no, status, driver_id, driver:driver_id(name), vehicle:vehicle_id(plate_no)').in('do_no', doNums)
+    : { data: [] };
   const tripByDo = {};
   (trips || []).forEach(t => { tripByDo[t.do_no] = t; });
 
@@ -423,8 +466,10 @@ async function loadDispatchList() {
   el.innerHTML = '';
   withDo.forEach(function(r) {
     const trip = tripByDo[r.doNo];
+    // Hide cards for trips that are already arrived or delivered
+    if (trip && (trip.status === 'Arrived' || trip.status === 'Delivered')) return;
     const dest = r.info.destination || '—';
-    const ref  = (r.order_ref || '').replace('FABRIC|','');
+    const ref  = r.info.reqNo || (r.order_ref || '').replace('FABRIC|','').replace(/^REQ-\d{8}-/, '') || '—';
     const items = r.info.items || [];
     const totalRolls = items.reduce((s, it) => s + (it.rolls || 0), 0);
     const isDispatched  = !!trip;
@@ -446,13 +491,16 @@ async function loadDispatchList() {
     card.innerHTML = `
       <div style="cursor:pointer" onclick="const d=document.getElementById('${cardId}');d.style.display=d.style.display==='none'?'block':'none'">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.4rem">
-          <div style="font-size:.72rem;font-family:monospace;color:var(--cyan)">${r.doNo}</div>
+          <div>
+            <div style="font-size:.82rem;font-family:monospace;font-weight:700;color:var(--orange)">${ref !== '—' ? ref : '—'}</div>
+            ${hasDriver ? `<div style="font-size:.68rem;font-family:monospace;color:var(--cyan)">${r.doNo}</div>` : ''}
+          </div>
           <div style="font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:99px;background:${hasDriver?'rgba(16,185,129,.15)':isDispatched?'rgba(99,102,241,.15)':'rgba(249,115,22,.12)'};color:${hasDriver?'var(--green)':isDispatched?'#6366f1':'var(--orange)'}">
             ${hasDriver ? '✅ Driver Assigned' : isDispatched ? '⏳ Tunggu Driver' : '📦 Pending'}
           </div>
         </div>
         <div style="font-size:.9rem;font-weight:800;margin-bottom:.2rem">→ ${dest}</div>
-        <div style="font-size:.68rem;color:var(--muted)">${ref !== '—' ? 'Ref: '+ref+' · ' : ''}${totalRolls} roll · ${r.reviewed_by || '—'} <span style="opacity:.4">▾</span></div>
+        <div style="font-size:.68rem;color:var(--muted)">${r.info.fab ? r.info.fab+' · ' : ''}${totalRolls} roll · ${r.reviewed_by || '—'} <span style="opacity:.4">▾</span></div>
       </div>
       <div id="${cardId}" style="display:none;margin-top:.6rem;border-top:1px solid var(--border);padding-top:.6rem">
         ${itemsHtml}
@@ -476,13 +524,147 @@ async function loadDispatchList() {
     `;
     el.appendChild(card);
   });
+
+  // Also show non-fabric fleet trips (created from batch picks)
+  const fabricDoNos = new Set(doNums);
+  // Rawmat batch DO format: DO-YYYYMMDD-NNN (3-digit suffix from REQ ref)
+  // Boutique DO format: DO-YYYYMMDD-NNNN (4-digit suffix) — exclude those
+  // Fetch active trips (for display) — exclude Arrived/Delivered/Cancelled
+  const { data: allTrips } = await sb.from('fleet_trips')
+    .select('id, do_no, destination, status, notes, leg, driver_id, driver:driver_id(name), vehicle:vehicle_id(plate_no)')
+    .like('do_no', 'DO-________-___')
+    .not('status', 'in', '("Arrived","Cancelled","Delivered")')
+    .order('created_at', { ascending: false });
+
+  const nonFabTrips = (allTrips || []).filter(t => !fabricDoNos.has(t.do_no));
+
+  // Also fetch completed trips (Arrived/Delivered) to exclude from "Pending Dispatch" cards
+  const { data: completedTrips } = await sb.from('fleet_trips')
+    .select('do_no')
+    .like('do_no', 'DO-________-___')
+    .in('status', ['Arrived', 'Delivered'])
+    .order('created_at', { ascending: false });
+  const completedDos = new Set((completedTrips || []).map(t => t.do_no));
+
+  // Fetch carton counts for non-fabric dispatched trips from production_material_requests notes
+  const nonFabCartonMap = {};
+  if (nonFabTrips.length) {
+    const nonFabReqNos = nonFabTrips.map(t => (t.do_no || '').replace(/^DO-/, 'REQ-')).filter(Boolean);
+    const { data: nfReqs } = await sb.from('production_material_requests')
+      .select('order_ref, notes')
+      .in('order_ref', nonFabReqNos);
+    (nfReqs || []).forEach(function(r) {
+      const doNo = (r.order_ref || '').replace(/^REQ-/, 'DO-');
+      const m = (r.notes || '').match(/\|\|CARTON:(\d+)/);
+      if (m) nonFabCartonMap[doNo] = parseInt(m[1]);
+    });
+  }
+
+  nonFabTrips.forEach(function(trip) {
+    const hasDriver = !!trip.driver_id;
+    const cartonCount = nonFabCartonMap[trip.do_no] || 0;
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:14px;padding:.85rem 1rem;margin-bottom:.65rem';
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.4rem">
+        <div style="font-size:.72rem;font-family:monospace;color:var(--purple)">${trip.do_no}</div>
+        <div style="font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:99px;background:${hasDriver?'rgba(16,185,129,.15)':'rgba(99,102,241,.15)'};color:${hasDriver?'var(--green)':'#6366f1'}">
+          ${hasDriver ? '✅ Driver Assigned' : '⏳ Tunggu Driver'}
+        </div>
+      </div>
+      <div style="font-size:.9rem;font-weight:800;margin-bottom:.2rem">→ ${trip.destination || '—'}</div>
+      <div style="font-size:.68rem;color:var(--muted);display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <span>📦 Material · ${trip.status}</span>
+        ${cartonCount > 0 ? `<span style="font-size:.68rem;font-weight:700;color:var(--accent)">📦 ${cartonCount} carton</span>` : ''}
+      </div>
+      ${hasDriver
+        ? `<div style="font-size:.72rem;color:var(--green);margin-top:.4rem">🚐 ${trip.vehicle?.plate_no||'—'} · 👤 ${trip.driver?.name||'—'}</div>`
+        : `<div style="text-align:center;padding:.5rem;font-size:.75rem;color:var(--muted);margin-top:.5rem">⏳ Tunggu fleet assign driver...</div>`
+      }
+    `;
+    el.appendChild(card);
+  });
+
+  // Issued rawmat batches without fleet trip (user closed dispatch modal)
+  const { data: issuedRawmat } = await sb.from('production_material_requests')
+    .select('id, order_ref, reason, notes')
+    .eq('status', 'Issued')
+    .not('order_ref', 'like', 'FABRIC|%')
+    .not('order_ref', 'is', null)
+    .order('id', { ascending: false });
+
+  if (issuedRawmat && issuedRawmat.length) {
+    // Group by order_ref
+    const batchMapD = {};
+    issuedRawmat.forEach(r => {
+      if (!batchMapD[r.order_ref]) batchMapD[r.order_ref] = [];
+      batchMapD[r.order_ref].push(r);
+    });
+    const existingNonFabDos = new Set(nonFabTrips.map(t => t.do_no));
+
+    Object.entries(batchMapD).forEach(function([orderRef, batch]) {
+      // Generate DO number from order_ref: REQ-/RQM- → DO-
+      const doNo = orderRef.replace(/^(REQ|RQM|RQF)-/, 'DO-');
+      if (existingNonFabDos.has(doNo)) return; // already dispatched & active
+      if (completedDos.has(doNo)) return; // already arrived/delivered
+
+      // Parse destination from reason
+      const reason = batch[0].reason || '';
+      const destMatch = reason.match(/📍 (.+?)(?:\s*·\s*.+)?$/);
+      const dest = destMatch ? destMatch[1].trim() : '';
+
+      // Check if cartons have been registered (notes contains ||CARTON:N)
+      const allNotes = batch.map(r => r.notes || '').join(' ');
+      const cartonMatch = allNotes.match(/\|\|CARTON:(\d+)/);
+      const cartonCount = cartonMatch ? parseInt(cartonMatch[1]) : 0;
+      const cartonRegistered = cartonCount > 0;
+
+      const card = document.createElement('div');
+      card.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:14px;padding:.85rem 1rem;margin-bottom:.65rem';
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.4rem">
+          <div style="font-size:.72rem;font-family:monospace;color:var(--purple)">${orderRef}</div>
+          <div style="font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:99px;background:rgba(249,115,22,.12);color:var(--orange)">
+            📦 Pending Dispatch
+          </div>
+        </div>
+        <div style="font-size:.9rem;font-weight:800;margin-bottom:.2rem">→ ${dest || '(tiada destinasi)'}</div>
+        <div style="font-size:.68rem;color:var(--muted)">📦 Raw Material · ${batch.length} item · Issued</div>
+        ${cartonRegistered ? `<div style="font-size:.7rem;color:var(--green);margin-top:.35rem;font-weight:600">✅ ${cartonCount} carton didaftarkan</div>` : `<div style="font-size:.7rem;color:var(--muted);margin-top:.35rem">⚠️ Carton belum didaftarkan</div>`}
+        <div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.65rem">
+          <button onclick="openRegisterCarton('${orderRef}','${dest.replace(/'/g,"\\'")}','${batch[0].id}')"
+            style="width:100%;padding:.5rem;background:var(--cyan);border:none;border-radius:9px;color:#fff;font-size:.82rem;font-weight:700;cursor:pointer">
+            📋 ${cartonRegistered ? 'Kemaskini Carton (' + cartonCount + ')' : 'Daftar Carton'}
+          </button>
+          <button onclick="${cartonRegistered ? `openDispatchModal('${doNo}','${dest.replace(/'/g,"\\'")}','',true)` : `alert('Daftar carton dulu sebelum dispatch.')`}"
+            style="width:100%;padding:.6rem;background:${cartonRegistered ? 'var(--orange)' : 'var(--surface2)'};border:${cartonRegistered ? 'none' : '1px solid var(--border)'};border-radius:9px;color:${cartonRegistered ? '#fff' : 'var(--muted)'};font-size:.85rem;font-weight:700;cursor:${cartonRegistered ? 'pointer' : 'not-allowed'};opacity:${cartonRegistered ? '1' : '.5'}">
+            🚐 Dispatch ke Fleet
+          </button>
+        </div>
+      `;
+      el.appendChild(card);
+    });
+  }
+
+  if (!withDo.length && !nonFabTrips.length && el.children.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.85rem">Tiada DO pending dispatch</div>';
+  }
 }
 
 async function loadPickBadge() {
-  const [{ count: pickCount }, { count: poCount }] = await Promise.all([
-    sb.from('production_material_requests').select('id', { count: 'exact', head: true }).eq('status', 'Approved'),
+  const [{ data: approvedReqs }, { count: poCount }] = await Promise.all([
+    sb.from('production_material_requests').select('id, order_ref').eq('status', 'Approved'),
     sb.from('raw_material_po').select('id', { count: 'exact', head: true }).in('status', ['Submitted','Partially Received'])
   ]);
+
+  // Count unique batches (group non-fabric by order_ref, fabric each = 1)
+  const reqs = approvedReqs || [];
+  const batchKeys = new Set();
+  reqs.forEach(function(r) {
+    if (r.order_ref && r.order_ref.startsWith('FABRIC|')) { batchKeys.add(r.id); }
+    else { batchKeys.add(r.order_ref || r.id); }
+  });
+  const pickCount = batchKeys.size;
 
   // Pick badge
   const pickDesc = document.getElementById('pick-badge-desc');
@@ -524,6 +706,347 @@ function onOverlayClick(e) {
    2. Selects PO at bottom (optional)
    3. Confirm → update stock + PO
 ════════════════════════════════════════════ */
+
+/* ─── HISTORY ──────────────────────────────── */
+let _historyData = [];
+
+async function loadHistory() {
+  const el = document.getElementById('history-list');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">⏳ Loading...</div>';
+
+  // Fetch all non-fabric issued/rejected requests
+  const [{ data: matReqs }, { data: fabReqs }, { data: fabOutMoves }] = await Promise.all([
+    sb.from('production_material_requests')
+      .select('id, order_ref, reason, notes, status, requested_at, reviewed_at, requested_by, reviewed_by, qty_requested, material:material_id(name, unit)')
+      .not('order_ref', 'like', 'FABRIC|%')
+      .not('order_ref', 'is', null)
+      .in('status', ['Issued', 'Rejected', 'Delivered'])
+      .order('requested_at', { ascending: false })
+      .limit(200),
+    sb.from('production_material_requests')
+      .select('id, order_ref, reason, status, requested_at, reviewed_at, requested_by, reviewed_by, qty_requested')
+      .like('order_ref', 'FABRIC|%')
+      .in('status', ['Issued', 'Rejected', 'Delivered'])
+      .order('requested_at', { ascending: false })
+      .limit(100),
+    sb.from('raw_material_movements')
+      .select('reference, note')
+      .eq('type', 'out')
+      .not('note', 'is', null)
+      .order('created_at', { ascending: true })
+      .limit(500)
+  ]);
+
+  // Build map: reqId → [{reference, scanned:[qr1,qr2,...]}]
+  const fabReqIds = new Set((fabReqs || []).map(function(r){ return r.id; }));
+  const fabMovMap = {};
+  (fabOutMoves || []).forEach(function(mv) {
+    if (!mv.note) return;
+    const parts = mv.note.split(' | ');
+    const reqId = parts[0];
+    if (!fabReqIds.has(reqId)) return;
+    if (!fabMovMap[reqId]) fabMovMap[reqId] = [];
+    fabMovMap[reqId].push({ reference: mv.reference, scanned: parts.slice(1).filter(Boolean) });
+  });
+
+  // Group non-fabric by order_ref
+  const batchMap = {};
+  (matReqs || []).forEach(function(r) {
+    if (!batchMap[r.order_ref]) batchMap[r.order_ref] = [];
+    batchMap[r.order_ref].push(r);
+  });
+
+  // Fetch fleet trip statuses for all
+  const matDos = Object.keys(batchMap).map(function(ref){ return ref.replace(/^(REQ|RQM|RQF)-/, 'DO-'); });
+  const fabDos = (fabReqs || []).map(function(r) {
+    const date = r.reviewed_at ? new Date(r.reviewed_at) : new Date(r.requested_at);
+    const refSuffix = (r.order_ref||'').replace('FABRIC|','').replace(/^R[EQ][QMF]-\d{8}-/, '').replace(/^REQ-\d{8}-/, '').trim() || r.id.slice(-4).toUpperCase();
+    return 'DO-' + date.getFullYear() + ('0'+(date.getMonth()+1)).slice(-2) + ('0'+date.getDate()).slice(-2) + '-' + refSuffix;
+  });
+  const allDos = matDos.concat(fabDos).filter(Boolean);
+
+  const tripByDo = {};
+  if (allDos.length) {
+    const { data: trips } = await sb.from('fleet_trips').select('do_no, status, driver:driver_id(name), vehicle:vehicle_id(plate_no)').in('do_no', allDos);
+    (trips || []).forEach(function(t){ if (t.do_no) tripByDo[t.do_no] = t; });
+  }
+
+  // Build combined list: { type, ref, date, status, tripStatus, items[], destLabel }
+  const histItems = [];
+
+  // Non-fabric batches
+  Object.keys(batchMap).sort(function(a,b){ return new Date(batchMap[b][0].requested_at) - new Date(batchMap[a][0].requested_at); }).forEach(function(ref) {
+    const batch = batchMap[ref];
+    const first = batch[0];
+    const doNo = ref.replace(/^(REQ|RQM|RQF)-/, 'DO-');
+    const trip = tripByDo[doNo];
+    const reasonText = first.reason || '';
+    const destMatch = reasonText.match(/📍\s*(.+?)(?:\s*·\s*.+)?$/);
+    histItems.push({
+      type: 'material',
+      ref: ref,
+      doNo: doNo,
+      date: new Date(first.requested_at),
+      status: first.status,
+      tripStatus: trip ? trip.status : null,
+      tripDriver: trip && trip.driver ? trip.driver.name : null,
+      tripPlate: trip && trip.vehicle ? trip.vehicle.plate_no : null,
+      dest: destMatch ? destMatch[1].trim() : '—',
+      requestedBy: first.requested_by,
+      reviewedBy: batch.map(function(r){ return r.reviewed_by; }).filter(Boolean)[0] || null,
+      items: batch.map(function(r){ return { name: r.material ? r.material.name : '—', qty: r.qty_requested, unit: r.material ? r.material.unit : '', status: r.status }; })
+    });
+  });
+
+  // Fabric requests
+  (fabReqs || []).forEach(function(r) {
+    const date = r.reviewed_at ? new Date(r.reviewed_at) : new Date(r.requested_at);
+    const refSuffix = (r.order_ref||'').replace('FABRIC|','').replace(/^R[EQ][QMF]-\d{8}-/, '').replace(/^REQ-\d{8}-/, '').trim() || r.id.slice(-4).toUpperCase();
+    const doNo = 'DO-' + date.getFullYear() + ('0'+(date.getMonth()+1)).slice(-2) + ('0'+date.getDate()).slice(-2) + '-' + refSuffix;
+    const trip = tripByDo[doNo];
+    let info = {};
+    try { info = JSON.parse(r.reason || '{}'); } catch(e) {}
+    const displayRef = (r.order_ref||'').replace('FABRIC|','');
+    histItems.push({
+      type: 'fabric',
+      ref: displayRef,
+      doNo: doNo,
+      date: new Date(r.requested_at),
+      status: r.status,
+      tripStatus: trip ? trip.status : null,
+      tripDriver: trip && trip.driver ? trip.driver.name : null,
+      tripPlate: trip && trip.vehicle ? trip.vehicle.plate_no : null,
+      dest: info.destination || '—',
+      requestedBy: r.requested_by,
+      reviewedBy: r.reviewed_by,
+      fab: info.fab || '—',
+      items: (info.items || []).map(function(it) {
+        const gsmNum = (it.gsm || '').replace(/gsm$/i,'').trim();
+        const refKey = 'gsm-' + gsmNum + '/' + it.code;
+        const movForItem = (fabMovMap[r.id] || []).find(function(m){ return (m.reference || '').includes(refKey); });
+        return { name: it.code + ' · ' + it.gsm, qty: it.rolls, unit: 'roll', scanned: movForItem ? movForItem.scanned : [] };
+      })
+    });
+  });
+
+  // Sort by date desc
+  histItems.sort(function(a,b){ return b.date - a.date; });
+  _historyData = histItems;
+  renderHistoryList(histItems);
+}
+
+function filterHistory() {
+  const q = (document.getElementById('history-search')?.value || '').toLowerCase().trim();
+  if (!q) { renderHistoryList(_historyData); return; }
+  const filtered = _historyData.filter(function(h) {
+    return (h.ref||'').toLowerCase().includes(q)
+      || (h.doNo||'').toLowerCase().includes(q)
+      || (h.dest||'').toLowerCase().includes(q)
+      || (h.requestedBy||'').toLowerCase().includes(q)
+      || (h.items||[]).some(function(it){ return (it.name||'').toLowerCase().includes(q); });
+  });
+  renderHistoryList(filtered);
+}
+
+function renderHistoryList(items) {
+  const el = document.getElementById('history-list');
+  if (!el) return;
+  if (!items.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.82rem">Tiada rekod ditemui.</div>';
+    return;
+  }
+
+  const statusColor = { Issued: 'var(--cyan)', Delivered: 'var(--green)', Rejected: 'var(--red)', Arrived: 'var(--green)' };
+  const tripColor   = { Assigned: '#6366f1', Departed: '#f59e0b', Arrived: 'var(--green)', Delivered: 'var(--green)', Cancelled: 'var(--muted)' };
+
+  el.innerHTML = items.map(function(h, idx) {
+    const uid = 'hcard-' + idx;
+    const isFab = h.type === 'fabric';
+    const accentColor = isFab ? 'var(--orange)' : 'var(--purple)';
+    const typeLabel = isFab ? '🧵 Fabric Roll' : '📦 Raw Material';
+    const dateStr = h.date.toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' });
+    const statusBadge = h.tripStatus
+      ? '<span style="background:' + (tripColor[h.tripStatus]||'var(--muted)') + '20;color:' + (tripColor[h.tripStatus]||'var(--muted)') + ';font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:99px">🚚 ' + h.tripStatus + '</span>'
+      : '<span style="background:' + (statusColor[h.status]||'rgba(255,255,255,.1)') + '20;color:' + (statusColor[h.status]||'var(--muted)') + ';font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:99px">' + h.status + '</span>';
+
+    const itemsHtml = (h.items || []).map(function(it) {
+      const rollsHtml = (it.scanned && it.scanned.length)
+        ? '<div style="margin:.2rem 0 .3rem .3rem;display:flex;flex-direction:column;gap:.1rem">'
+          + it.scanned.map(function(qr) {
+              return '<div style="font-size:.65rem;font-family:monospace;color:var(--cyan);letter-spacing:.02em">· ' + qr + '</div>';
+            }).join('')
+          + '</div>'
+        : '';
+      return '<div style="padding:.3rem 0;border-top:1px solid var(--border);font-size:.78rem">'
+        + '<div style="display:flex;justify-content:space-between">'
+        + '<span>' + it.name + '</span>'
+        + '<span style="font-weight:700;color:var(--text)">' + it.qty + ' ' + it.unit + '</span>'
+        + '</div>'
+        + rollsHtml
+        + '</div>';
+    }).join('');
+
+    const detailsHtml = '<div id="' + uid + '" style="display:none;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border)">'
+      + (isFab ? '<div style="font-size:.7rem;color:var(--muted);margin-bottom:.35rem">🏭 ' + h.fab + '</div>' : '')
+      + itemsHtml
+      + '<div style="margin-top:.5rem;display:flex;flex-direction:column;gap:.2rem">'
+      + '<div style="font-size:.68rem;color:var(--muted)">📍 Destinasi: <strong style="color:var(--text)">' + h.dest + '</strong></div>'
+      + '<div style="font-size:.68rem;color:var(--muted)">👤 Diminta oleh: <strong style="color:var(--text)">' + (h.requestedBy||'—') + '</strong></div>'
+      + '<div style="font-size:.68rem;color:var(--muted)">🙋 Di-Pick oleh: <strong style="color:' + (h.reviewedBy ? 'var(--cyan)' : 'var(--muted)') + '">' + (h.reviewedBy||'—') + '</strong></div>'
+      + (h.doNo ? '<div style="font-size:.68rem;color:var(--muted);font-family:monospace">DO: <strong style="color:var(--cyan)">' + h.doNo + '</strong></div>' : '')
+      + (h.tripDriver ? '<div style="font-size:.68rem;color:var(--muted)">🚐 Driver: <strong style="color:var(--text)">' + h.tripDriver + (h.tripPlate ? ' · ' + h.tripPlate : '') + '</strong></div>' : '')
+      + '</div></div>';
+
+    return '<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid ' + accentColor + ';border-radius:12px;padding:.75rem .9rem;margin-bottom:.5rem">'
+      + '<div onclick="var d=document.getElementById(\'' + uid + '\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'" style="cursor:pointer">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.4rem">'
+      + '<div>'
+      + '<div style="font-size:.8rem;font-weight:700;font-family:monospace;color:' + accentColor + '">' + h.ref + '</div>'
+      + '<div style="font-size:.62rem;color:var(--muted);margin-top:.1rem">' + typeLabel + ' · ' + dateStr + '</div>'
+      + '</div>'
+      + statusBadge
+      + '</div>'
+      + '<div style="font-size:.75rem;color:var(--muted);margin-top:.3rem">→ <strong style="color:var(--text)">' + h.dest + '</strong>'
+      + ' &nbsp;·&nbsp; ' + (h.items||[]).length + ' item <span style="opacity:.5;font-size:.7rem">▾</span></div>'
+      + '</div>'
+      + detailsHtml
+      + '</div>';
+  }).join('');
+}
+
+/* ─── STOCK COUNT ──────────────────────────── */
+async function loadStockCount() {
+  const el = document.getElementById('sc-body');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:.8rem">⏳ Loading stok...</div>';
+
+  // Fetch raw materials (non-fabric)
+  const [{ data: mats }, { data: fabMoves }, { data: skuPOs }] = await Promise.all([
+    sb.from('raw_materials').select('id, name, unit, current_stock').eq('is_fabric_roll', false).order('name'),
+    sb.from('raw_material_movements').select('type, qty, reference').order('created_at', { ascending: true }),
+    sb.from('raw_material_po').select('po_no, sku_prefix, details').eq('rm_type', 'Fabric Roll')
+  ]);
+
+  // Build fabric balance (inCount - outCount per gsm/code)
+  const fabMap = {};
+  const skuByPo = {};
+  (skuPOs || []).forEach(function(p) {
+    if (p.sku_prefix) skuByPo[p.po_no] = p.sku_prefix;
+  });
+
+  (fabMoves || []).forEach(function(mv) {
+    const ref = mv.reference || '';
+    const fd = ref.indexOf(' · '); if (fd < 0) return;
+    const afterPo = ref.slice(fd + 3);
+    const sd = afterPo.indexOf(' · ');
+    const seg = sd >= 0 ? afterPo.slice(0, sd).trim() : afterPo.trim();
+    if (!seg.includes('/')) return;
+    const si = seg.indexOf('/');
+    const gsm = seg.slice(0, si).trim(), code = seg.slice(si + 1).trim();
+    const key = gsm + '/' + code;
+    const poNo = ref.slice(0, fd).trim();
+    const sku = skuByPo[poNo] || '';
+    if (!fabMap[key]) fabMap[key] = { gsm, code, sku, inCount: 0, outCount: 0 };
+    if (mv.type === 'in')  fabMap[key].inCount++;
+    if (mv.type === 'out') fabMap[key].outCount++;
+  });
+  const fabItems = Object.values(fabMap).filter(function(f){ return (f.inCount - f.outCount) > 0 || true; })
+    .sort(function(a,b){ return a.gsm.localeCompare(b.gsm) || a.code.localeCompare(b.code); });
+
+  // Generate ref_no
+  const today = new Date();
+  const dateStr = today.getFullYear() + ('0'+(today.getMonth()+1)).slice(-2) + ('0'+today.getDate()).slice(-2);
+  const { data: todayTakes } = await sb.from('stock_takes').select('id').like('ref_no', 'SC-' + dateStr + '-%');
+  const seq = String((todayTakes||[]).length + 1).padStart(3,'0');
+  const refNo = 'SC-' + dateStr + '-' + seq;
+
+  // Build UI
+  const INP = 'width:5rem;padding:.35rem .5rem;background:var(--surface2,#1e293b);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;text-align:center;outline:none';
+  let html = '<div style="font-size:.72rem;font-family:monospace;color:var(--muted);margin-bottom:.85rem">Ref: <strong style="color:var(--orange)">' + refNo + '</strong></div>';
+
+  // Raw Material section
+  if (mats && mats.length) {
+    html += '<div style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.45rem">📦 Raw Material</div>';
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1rem">';
+    (mats || []).forEach(function(m, i) {
+      const sysQty = m.current_stock || 0;
+      html += '<div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .85rem;' + (i > 0 ? 'border-top:1px solid var(--border)' : '') + '">'
+        + '<div style="flex:1;font-size:.82rem;font-weight:600">' + m.name + '</div>'
+        + '<div style="font-size:.7rem;color:var(--muted);min-width:3.5rem;text-align:right">Sys: <strong>' + sysQty + '</strong> ' + (m.unit||'') + '</div>'
+        + '<input id="sc-rm-' + m.id + '" data-type="rawmat" data-id="' + m.id + '" data-label="' + m.name + '" data-sysqty="' + sysQty + '" data-unit="' + (m.unit||'') + '" type="number" min="0" step="0.01" placeholder="—" style="' + INP + '">'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Fabric Roll section
+  if (fabItems.length) {
+    html += '<div style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.45rem">🧵 Fabric Roll</div>';
+    let lastGsm = '';
+    fabItems.forEach(function(f) {
+      const sysQty = f.inCount - f.outCount;
+      const key = f.gsm + '/' + f.code;
+      const skuLabel = f.sku ? f.sku + f.code : f.code;
+      if (f.gsm !== lastGsm) {
+        if (lastGsm) html += '</div>';
+        html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:.6rem">'
+          + '<div style="padding:.45rem .85rem;font-size:.68rem;font-weight:700;color:var(--orange);border-bottom:1px solid var(--border)">' + f.gsm.toUpperCase() + '</div>';
+        lastGsm = f.gsm;
+      }
+      html += '<div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .85rem;border-top:1px solid var(--border)">'
+        + '<div style="flex:1;font-size:.82rem;font-weight:600">' + skuLabel + '</div>'
+        + '<div style="font-size:.7rem;color:var(--muted);min-width:3.5rem;text-align:right">Sys: <strong>' + sysQty + '</strong> roll</div>'
+        + '<input id="sc-fab-' + key.replace('/','_') + '" data-type="fabric" data-key="' + key + '" data-gsm="' + f.gsm + '" data-code="' + f.code + '" data-sku="' + skuLabel + '" data-sysqty="' + sysQty + '" type="number" min="0" step="1" placeholder="—" style="' + INP + '">'
+        + '</div>';
+    });
+    if (lastGsm) html += '</div>';
+  }
+
+  html += '<div style="margin-top:.5rem">'
+    + '<textarea id="sc-notes" placeholder="Nota (optional)..." style="width:100%;box-sizing:border-box;padding:.6rem .75rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.8rem;resize:none;height:4rem;outline:none"></textarea>'
+    + '</div>'
+    + '<button onclick="submitStockCount(\'' + refNo + '\')" style="width:100%;margin-top:.65rem;padding:.75rem;background:var(--orange);color:#fff;border:none;border-radius:12px;font-size:.9rem;font-weight:800;cursor:pointer">📤 Hantar Stock Count</button>';
+
+  el.innerHTML = html;
+}
+
+async function submitStockCount(refNo) {
+  const notes = document.getElementById('sc-notes')?.value.trim() || '';
+  const inputs = document.querySelectorAll('#sc-body input[data-type]');
+  const items = [];
+
+  inputs.forEach(function(inp) {
+    const val = inp.value.trim();
+    if (val === '' || val === null) return; // skip unfilled
+    const counted = parseFloat(val);
+    if (isNaN(counted)) return;
+    const type = inp.dataset.type;
+    if (type === 'rawmat') {
+      items.push({ item_type: 'rawmat', material_id: inp.dataset.id, item_label: inp.dataset.label, system_qty: parseFloat(inp.dataset.sysqty)||0, counted_qty: counted, unit: inp.dataset.unit });
+    } else if (type === 'fabric') {
+      items.push({ item_type: 'fabric', item_key: inp.dataset.key, item_label: inp.dataset.sku, gsm: inp.dataset.gsm, colour_code: inp.dataset.code, system_qty: parseFloat(inp.dataset.sysqty)||0, counted_qty: counted, unit: 'roll' });
+    }
+  });
+
+  if (!items.length) { showToast('Masukkan sekurang-kurangnya 1 kiraan.'); return; }
+
+  const user = _user?.full_name || _user?.username || 'Staff';
+  const { data: st, error: stErr } = await sb.from('stock_takes').insert({
+    ref_no: refNo, status: 'Submitted', created_by: user,
+    submitted_at: new Date().toISOString(), notes: notes || null
+  }).select('id').single();
+
+  if (stErr || !st) { showToast('Ralat: ' + (stErr?.message || 'unknown')); return; }
+
+  const rows = items.map(function(it){ return { ...it, stock_take_id: st.id }; });
+  const { error: itErr } = await sb.from('stock_take_items').insert(rows);
+  if (itErr) { showToast('Ralat simpan items: ' + itErr.message); return; }
+
+  showToast('✅ Stock count ' + refNo + ' dihantar!');
+  goHome();
+}
+
 let _recvMats = [];   // all raw_materials
 let _recvPOs  = [];   // available POs
 
@@ -1290,6 +1813,35 @@ async function confirmPOReceive(poId, poNo) {
         return recv > 0;
       });
 
+      // For each item received — upsert into raw_materials + insert movement
+      const rmType = (await sb.from('raw_material_po').select('rm_type').eq('id', poId).single()).data?.rm_type || '';
+      for (var ii = 0; ii < poDetails.length; ii++) {
+        const it  = poDetails[ii];
+        const qty = parseFloat(newRecvDetails[ii] || 0) - parseFloat(existingRecv[ii] || 0);
+        if (qty <= 0) continue;
+        const itemName = (it.code || it.item_name || '').trim();
+        if (!itemName) continue;
+
+        // Find or create raw_materials entry
+        const { data: existMat } = await sb.from('raw_materials').select('id, current_stock').ilike('name', itemName).limit(1);
+        let matId, curStock = 0;
+        if (existMat && existMat[0]) {
+          matId = existMat[0].id;
+          curStock = existMat[0].current_stock || 0;
+          await sb.from('raw_materials').update({ current_stock: curStock + qty }).eq('id', matId);
+        } else {
+          const { data: newMat } = await sb.from('raw_materials').insert({
+            name: itemName, unit: 'unit', current_stock: qty, category: rmType || null
+          }).select('id').single();
+          matId = newMat?.id;
+        }
+        if (matId) {
+          await sb.from('raw_material_movements').insert({
+            material_id: matId, type: 'in', qty: qty, reference: poNo, created_by: staff
+          });
+        }
+      }
+
       // Try with received_details, fallback without if column doesn't exist
       const updatePayload = { status: allDone ? 'Received' : 'Partially Received', received_details: JSON.stringify(newRecvDetails) };
       let { error: upErr } = await sb.from('raw_material_po').update(updatePayload).eq('id', poId);
@@ -1921,43 +2473,250 @@ async function loadPickRequests() {
     return;
   }
 
-  el.innerHTML = '<div class="section-label">' + reqs.length + t('req_label') + '</div>'
-    + reqs.map(r => {
-      const mat = r.material;
-      const isFabric = r.order_ref && r.order_ref.startsWith('FABRIC|');
-      const ref = r.order_ref ? r.order_ref.replace('FABRIC|','') : '';
-      const date = new Date(r.requested_at).toLocaleDateString('en-MY', { day:'2-digit', month:'short' });
-      let badges = '';
-      if (isFabric) {
-        const info = parseFabricInfo(r.reason || '');
-        const totalRolls = info && info._json ? info.items.reduce((s,it)=>s+(it.rolls||0),0) : (info ? info.rolls : '—');
-        const fabLabel   = info && info._json ? info.fab : (mat?.name || '—');
-        const gsmList = info && info._json
-          ? [...new Set(info.items.map(it=>it.gsm))].map(g=>`<span class="req-badge">${g}</span>`).join('')
-          : (info?.gsm ? `<span class="req-badge">${info.gsm}</span>` : '');
-        badges = `<div class="req-badges">
-          <span class="req-badge">🧵 Fabric Roll</span>
-          <span class="req-badge">${totalRolls} roll</span>
-          ${gsmList}
-        </div>`;
-      } else {
-        badges = `<div class="req-badges">
-          <span class="req-badge">📋 Material</span>
-          <span class="req-badge">Qty: ${r.qty_requested} ${mat?.unit || ''}</span>
-          ${ref ? '<span class="req-badge">Ref: ' + ref + '</span>' : ''}
-        </div>`;
+  // Separate fabric (individual) vs non-fabric (group by order_ref)
+  const fabricReqs   = reqs.filter(r => r.order_ref && r.order_ref.startsWith('FABRIC|'));
+  const nonFabReqs   = reqs.filter(r => !r.order_ref || !r.order_ref.startsWith('FABRIC|'));
+
+  // Group non-fabric by order_ref
+  const batchMap = {};
+  nonFabReqs.slice().sort((a,b) => new Date(a.requested_at)-new Date(b.requested_at)).forEach(r => {
+    if (r.order_ref) {
+      if (!batchMap[r.order_ref]) batchMap[r.order_ref] = [];
+      batchMap[r.order_ref].push(r);
+    } else {
+      const ts = new Date(r.requested_at).getTime();
+      let placed = false;
+      const keys = Object.keys(batchMap);
+      for (let k = keys.length-1; k >= 0; k--) {
+        const grp = batchMap[keys[k]];
+        const last = grp[grp.length-1];
+        if (!last.order_ref && last.requested_by === r.requested_by && Math.abs(new Date(last.requested_at).getTime()-ts) <= 60000) {
+          grp.push(r); placed = true; break;
+        }
       }
-      const cardTitle = isFabric ? (parseFabricInfo(r.reason||'')?._json ? parseFabricInfo(r.reason||'').fab : (mat?.name||'—')) : (mat?.name||'—');
-      return `<div class="req-card" onclick="openPickModal('${r.id}')">
-        <div class="req-name">${cardTitle}</div>
-        <div class="req-sub">Diminta oleh: ${r.requested_by || '—'} · ${date}</div>
-        ${badges}
-        ${r.reason && !isFabric ? '<div style="font-size:.7rem;color:var(--muted);margin-top:.35rem">📝 ' + r.reason + '</div>' : ''}
-        <div style="display:flex;justify-content:flex-end;margin-top:.5rem">
-          <span style="font-size:.72rem;font-weight:700;color:var(--cyan)">${t('tap_process')}</span>
+      if (!placed) batchMap['_solo_'+r.id] = [r];
+    }
+  });
+  const batches = Object.values(batchMap).sort((a,b) => new Date(a[0].requested_at)-new Date(b[0].requested_at));
+  const totalCards = fabricReqs.length + batches.length;
+
+  const fabricCards = fabricReqs.map(r => {
+    const mat = r.material;
+    const ref = r.order_ref.replace('FABRIC|','');
+    const date = new Date(r.requested_at).toLocaleDateString('en-MY', { day:'2-digit', month:'short' });
+    const info = parseFabricInfo(r.reason || '');
+    const totalRolls = info && info._json ? info.items.reduce((s,it)=>s+(it.rolls||0),0) : (info ? info.rolls : '—');
+    const gsmList = info && info._json
+      ? [...new Set(info.items.map(it=>it.gsm))].map(g=>`<span class="req-badge">${g}</span>`).join('')
+      : (info?.gsm ? `<span class="req-badge">${info.gsm}</span>` : '');
+    const cardTitle = info?._json ? info.fab : (mat?.name||'—');
+    return `<div class="req-card" onclick="openPickModal('${r.id}')">
+      <div class="req-name">${cardTitle}</div>
+      <div class="req-sub">Diminta oleh: ${r.requested_by||'—'} · ${date}</div>
+      <div class="req-badges"><span class="req-badge">🧵 Fabric Roll</span><span class="req-badge">${totalRolls} roll</span>${gsmList}</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:.5rem">
+        <span style="font-size:.72rem;font-weight:700;color:var(--cyan)">${t('tap_process')}</span>
+      </div>
+    </div>`;
+  });
+
+  const batchCards = batches.map(batch => {
+    const first = batch[0];
+    const date  = new Date(first.requested_at).toLocaleDateString('en-MY', { day:'2-digit', month:'short' });
+    const batchTitle = (first.order_ref && !first.order_ref.startsWith('_solo_')) ? first.order_ref : ('REQ · ' + date);
+    const reasonText = first.reason || '';
+    const category   = reasonText.split(' · ')[0] || 'Material';
+    const itemNames  = batch.map(r => r.material?.name || '—').join(', ');
+    const batchIdsJson = JSON.stringify(batch.map(r => r.id));
+    return `<div class="req-card" onclick="openBatchPickModal(${batchIdsJson.replace(/"/g,"'")})">
+      <div class="req-name">${batchTitle}</div>
+      <div class="req-sub">Diminta oleh: ${first.requested_by||'—'} · ${date}</div>
+      <div class="req-badges">
+        <span class="req-badge">📦 ${category}</span>
+        <span class="req-badge">${batch.length} item</span>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:.3rem">${itemNames}</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:.5rem">
+        <span style="font-size:.72rem;font-weight:700;color:var(--cyan)">${t('tap_process')}</span>
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = '<div class="section-label">' + totalCards + t('req_label') + '</div>'
+    + fabricCards.join('') + batchCards.join('');
+}
+
+async function openBatchPickModal(ids) {
+  // ids is array of request IDs
+  const { data: reqs } = await sb.from('production_material_requests')
+    .select('*, material:material_id(id, name, unit, current_stock)')
+    .in('id', ids);
+  if (!reqs || !reqs.length) return;
+
+  const first = reqs[0];
+  const batchTitle = (first.order_ref && !first.order_ref.startsWith('_solo_')) ? first.order_ref : 'Request';
+  // Extract destination from reason field (stored as "📍 destination" at end)
+  const destMatch = (first.reason||'').match(/📍\s*(.+?)(?:\s*·\s*.+)?$/);
+  const prefillDest = destMatch ? destMatch[1].trim() : '';
+
+  // Persist confirmed state across Back navigation
+  window._bpConfirmedByBatch = window._bpConfirmedByBatch || {};
+  const batchKey = reqs[0]?.order_ref || ids.join(',');
+  window._bpConfirmedByBatch[batchKey] = window._bpConfirmedByBatch[batchKey] || {};
+  window._bpConfirmed = window._bpConfirmedByBatch[batchKey];
+  window._bpAllDone = false;
+  const total = reqs.length;
+
+  const itemRows = reqs.map((r) => {
+    const mat = r.material;
+    const stockColor = (mat?.current_stock||0) >= r.qty_requested ? 'var(--green)' : 'var(--red)';
+    return `<div id="bpc-${r.id}" style="background:var(--bg);border-radius:10px;padding:.65rem;margin-bottom:.5rem;border:2px solid transparent;transition:border .2s">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
+        <span style="font-size:.82rem;font-weight:700">${mat?.name||'—'}</span>
+        <span style="font-size:.7rem;color:${stockColor}">Stok: ${mat?.current_stock||0} ${mat?.unit||''}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span style="font-size:.72rem;color:var(--muted);flex:1">Diminta: <strong style="color:var(--text)">${r.qty_requested} ${mat?.unit||''}</strong></span>
+        <input class="recv-input" id="bpq-${r.id}" type="number" step="any" min="0" value="${r.qty_requested}" placeholder="Qty" style="width:70px;text-align:right;font-size:.82rem">
+        <button id="bpb-${r.id}" onclick="bpConfirm('${r.id}',${total})" style="padding:.3rem .65rem;background:#f97316;color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">Pick</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const idList = reqs.map(r => `'${r.id}'`).join(',');
+  openModal(`
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
+      <button onclick="closeModal()" style="background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.3rem .7rem;font-size:.8rem;cursor:pointer">‹ Back</button>
+      <div>
+        <div class="modal-title" style="margin:0">${batchTitle}</div>
+        <div class="modal-sub" style="margin:0">${reqs.length} item</div>
+      </div>
+    </div>
+    ${itemRows}
+    <div class="recv-item" style="margin-bottom:.5rem">
+      <div class="recv-item-name" style="font-size:.75rem;font-weight:600;margin-bottom:.35rem">🚐 Delivery to</div>
+      <input class="recv-input" id="batch-pick-dest" type="text" placeholder="cth: Production Floor A / Kedai Utama" value="${prefillDest}">
+    </div>
+    <div class="recv-item" style="margin-bottom:.75rem">
+      <div class="recv-item-name" style="font-size:.75rem;font-weight:600;margin-bottom:.35rem">${t('notes_opt')}</div>
+      <input class="recv-input" id="batch-pick-notes" type="text" placeholder="${t('notes_ph')}">
+    </div>
+    <div class="form-err" id="batch-pick-err"></div>
+    <div class="btn-row">
+      <button class="btn-issue" id="batch-pick-btn" onclick="if(window._bpAllDone){confirmBatchPick([${idList}])}else{document.getElementById('batch-pick-err').textContent='Confirm semua item dulu.';document.getElementById('batch-pick-err').style.display='block';}" style="opacity:.4;cursor:not-allowed;width:100%">✅ Issue Semua</button>
+    </div>
+  `);
+  // Restore confirmed state from previous session
+  reqs.forEach(r => {
+    if (window._bpConfirmed[r.id] !== undefined) {
+      const card = document.getElementById('bpc-' + r.id);
+      const btn  = document.getElementById('bpb-' + r.id);
+      const inp  = document.getElementById('bpq-' + r.id);
+      if (inp)  inp.value = window._bpConfirmed[r.id];
+      if (card) card.style.borderColor = 'var(--green)';
+      if (btn)  { btn.textContent = '✅ Done'; btn.style.background = 'var(--green)'; btn.onclick = function(){ bpUnconfirm(r.id, total); }; }
+    }
+  });
+  if (Object.keys(window._bpConfirmed).length >= total) {
+    window._bpAllDone = true;
+    const mainBtn = document.getElementById('batch-pick-btn');
+    if (mainBtn) { mainBtn.style.opacity = '1'; mainBtn.style.cursor = 'pointer'; mainBtn.style.background = 'var(--cyan)'; }
+  }
+}
+
+function bpConfirm(reqId, total) {
+  const qty = parseFloat(document.getElementById('bpq-' + reqId)?.value) || 0;
+  if (qty <= 0) { alert('Masukkan qty dulu.'); return; }
+  window._bpConfirmed[reqId] = qty;
+  const card = document.getElementById('bpc-' + reqId);
+  const btn  = document.getElementById('bpb-' + reqId);
+  if (card) card.style.borderColor = 'var(--green)';
+  if (btn)  { btn.textContent = '✅ Done'; btn.style.background = 'var(--green)'; btn.onclick = function(){ bpUnconfirm(reqId, total); }; }
+  if (Object.keys(window._bpConfirmed).length >= total) {
+    window._bpAllDone = true;
+    const mainBtn = document.getElementById('batch-pick-btn');
+    if (mainBtn) { mainBtn.style.opacity = '1'; mainBtn.style.cursor = 'pointer'; mainBtn.style.background = 'var(--cyan)'; }
+  }
+}
+
+function bpUnconfirm(reqId, total) {
+  delete window._bpConfirmed[reqId];
+  window._bpAllDone = false;
+  const card = document.getElementById('bpc-' + reqId);
+  const btn  = document.getElementById('bpb-' + reqId);
+  if (card) card.style.borderColor = 'transparent';
+  if (btn)  { btn.textContent = 'Pick'; btn.style.background = '#f97316'; btn.onclick = function(){ bpConfirm(reqId, total); }; }
+  const mainBtn = document.getElementById('batch-pick-btn');
+  if (mainBtn) { mainBtn.style.opacity = '.4'; mainBtn.style.cursor = 'not-allowed'; mainBtn.style.background = ''; }
+}
+
+async function confirmBatchPick(ids) {
+  const dest  = document.getElementById('batch-pick-dest')?.value.trim() || '';
+  const notes = document.getElementById('batch-pick-notes')?.value || '';
+  const errEl = document.getElementById('batch-pick-err');
+  const staff = _user?.full_name || _user?.username || '—';
+  const issuedItems = [];
+  try {
+    for (const reqId of ids) {
+      const qty = window._bpConfirmed[reqId] || parseFloat(document.getElementById('bpq-' + reqId)?.value) || 0;
+      if (qty <= 0) continue;
+      const { data: r } = await sb.from('production_material_requests')
+        .select('*, material:material_id(id, name, current_stock, unit)').eq('id', reqId).single();
+      if (!r) continue;
+      const mat = r.material;
+      const newStock = (mat?.current_stock || 0) - qty;
+      issuedItems.push({ name: mat?.name || reqId, qty, unit: mat?.unit || '' });
+      await Promise.all([
+        sb.from('production_material_requests').update({
+          status: 'Issued', qty_issued: qty,
+          notes: [dest ? ('📍 ' + dest) : '', notes].filter(Boolean).join(' | ') || null,
+          reviewed_by: staff, reviewed_at: new Date().toISOString()
+        }).eq('id', reqId),
+        mat?.id ? sb.from('raw_materials').update({ current_stock: newStock }).eq('id', mat.id) : Promise.resolve(),
+        sb.from('raw_material_movements').insert({
+          material_id: mat?.id, type: 'out', qty,
+          reference: r.order_ref || reqId,
+          note: reqId + ' | ' + (r.reason || '') + (notes ? ' | ' + notes : ''),
+          created_by: staff
+        })
+      ]);
+    }
+    // Clear persisted state for this batch
+    const doneKey = Object.keys(window._bpConfirmedByBatch||{}).find(k => window._bpConfirmedByBatch[k] === window._bpConfirmed);
+    if (doneKey && window._bpConfirmedByBatch) delete window._bpConfirmedByBatch[doneKey];
+
+    // Generate DO number
+    const firstReqId = ids[0];
+    const { data: firstReq } = await sb.from('production_material_requests').select('order_ref').eq('id', firstReqId).single();
+    const orderRef = firstReq?.order_ref || firstReqId;
+    const refSuffix = orderRef.replace(/^REQ-\d{8}-/, '') || orderRef.slice(-4).toUpperCase();
+    const doDate = new Date();
+    const doNo = 'DO-' + doDate.getFullYear() + ('0'+(doDate.getMonth()+1)).slice(-2) + ('0'+doDate.getDate()).slice(-2) + '-' + refSuffix;
+
+    // Store issued items for label printing
+    window._lastCartonLabel = { doNo, dest, items: issuedItems, date: new Date().toLocaleDateString('ms-MY'), staff };
+
+    // Show success screen with Dispatch button
+    document.getElementById('modal-sheet').innerHTML = `
+      <div class="modal-handle"></div>
+      <div style="padding:2rem 1.25rem 1.5rem">
+        <div style="text-align:center;margin-bottom:1.5rem">
+          <div style="font-size:2.8rem;margin-bottom:.5rem">✅</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--green);margin-bottom:.25rem">${ids.length} Item Diterbitkan</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem;font-family:monospace">${doNo}</div>
+          ${dest ? '<div style="font-size:.78rem;color:var(--muted);margin-top:.3rem">📍 ' + dest + '</div>' : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+          <button onclick="printCartonLabel()" style="width:100%;padding:.75rem;background:var(--cyan);border:none;border-radius:10px;color:#fff;font-size:.9rem;font-weight:800;cursor:pointer">🏷️ Print Label Carton</button>
+          <button onclick="openDispatchModal('${doNo}','${dest.replace(/'/g,"\\'")}','',true)" style="width:100%;padding:.75rem;background:var(--orange);border:none;border-radius:10px;color:#fff;font-size:.9rem;font-weight:800;cursor:pointer">🚐 Dispatch ke Fleet</button>
+          <button onclick="closeModal()" style="width:100%;padding:.65rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;cursor:pointer">Tutup</button>
         </div>
       </div>`;
-    }).join('');
+    loadPickRequests();
+    loadPickBadge();
+  } catch(err) {
+    if (errEl) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+  }
 }
 
 async function openPickModal(reqId) {
@@ -2020,42 +2779,47 @@ async function openFabricPickModal(r, mat, ref) {
 
   // Fetch movements + PO sku_prefix map
   const [{ data: moves }, { data: poList }] = await Promise.all([
-    sb.from('raw_material_movements').select('qty, type, reference, created_at').order('created_at', { ascending: true }).limit(3000),
+    sb.from('raw_material_movements').select('qty, type, reference, note, created_at').order('created_at', { ascending: true }).limit(3000),
     sb.from('raw_material_po').select('po_no, sku_prefix')
   ]);
   const skuMap = {};
   (poList || []).forEach(p => { if (p.po_no) skuMap[p.po_no] = (p.sku_prefix || '').trim(); });
 
-  // For each item, find remaining FIFO rolls from movements
+  // Build set of all QR codes already issued (from out movement notes: "reqId | QR1 | QR2 | ...")
+  const issuedQrSet = new Set();
+  (moves || []).forEach(function(mv) {
+    if (mv.type !== 'out' || !mv.note) return;
+    mv.note.split(' | ').slice(1).forEach(function(qr) {
+      if (qr.trim()) issuedQrSet.add(qr.trim().toUpperCase());
+    });
+  });
+  window._issuedQrSet = issuedQrSet;
+
+  // For each item, find remaining rolls using roll-count FIFO (not meter-based)
   function getFifoRolls(code, gsmLabel) {
-    // gsmLabel e.g. "173gsm" → match reference containing "gsm-173"
-    const gsmNum = gsmLabel.replace(/gsm$/i,'').trim(); // "173"
-    const refKey = 'gsm-' + gsmNum + '/' + code;       // "gsm-173/D24"
+    const gsmNum = gsmLabel.replace(/gsm$/i,'').trim();
+    const refKey = 'gsm-' + gsmNum + '/' + code;
+    // Each 'in' movement = 1 roll received
     const inMoves = (moves || []).filter(m => m.type === 'in' && m.reference && m.reference.includes(refKey));
+    // Each 'out' movement may cover N rolls — parse from reference "· N roll"
     const outMoves = (moves || []).filter(m => m.type === 'out' && m.reference && m.reference.includes(refKey));
-    const outQty = outMoves.reduce((s, m) => s + (m.qty || 0), 0);
-    // FIFO: consume oldest in-moves first
-    let rem = outQty;
-    const remaining = [];
-    for (const mv of inMoves) {
-      const q = mv.qty || 0;
-      const consume = Math.min(q, rem);
-      rem -= consume;
-      if (q - consume > 0) {
-        // Extract roll ref from reference e.g. "PO-123456 · gsm-173/D24 · Roll 3"
-        const rollMatch = mv.reference.match(/Roll\s*(\d+)/i);
-        const poMatch   = mv.reference.match(/PO-([^\s·]+)/i);
-        const poNo      = poMatch ? 'PO-' + poMatch[1] : '?';
-        remaining.push({
-          ref: mv.reference,
-          rollNo: rollMatch ? rollMatch[1] : '?',
-          po: poNo,
-          sku: skuMap[poNo] || '',
-          meter: q - consume
-        });
-      }
-    }
-    return remaining;
+    const outRollCount = outMoves.reduce(function(s, m) {
+      const match = (m.reference || '').match(/(\d+)\s*roll/i);
+      return s + (match ? parseInt(match[1]) : 1);
+    }, 0);
+    // Remaining = in-moves after skipping outRollCount oldest (FIFO by date)
+    return inMoves.slice(outRollCount).map(function(mv) {
+      const rollMatch = mv.reference.match(/Roll\s*(\d+)/i);
+      const poMatch   = mv.reference.match(/PO-([^\s·]+)/i);
+      const poNo      = poMatch ? 'PO-' + poMatch[1] : '?';
+      return {
+        ref: mv.reference,
+        rollNo: rollMatch ? rollMatch[1] : '?',
+        po: poNo,
+        sku: skuMap[poNo] || '',
+        meter: mv.qty || 0
+      };
+    });
   }
 
   // Restore existing scan progress if returning to the same request
@@ -2308,6 +3072,7 @@ function pauseScan() {
   document.getElementById('scan-video').srcObject = null;
   document.getElementById('scan-overlay').style.display = 'none';
   _lastScanData = null;
+  if (_cartonScanMode) { _cartonScanMode = null; loadDispatchList(); return; }
   // Refresh modal list to show current scan state
   if (window._pickRenderItems) window._pickRenderItems();
 }
@@ -2329,6 +3094,9 @@ function onQrScanned(data) {
   if (data === _lastScanData) return;
   _lastScanData = data;
 
+  // Route to carton scanner if in carton mode
+  if (_cartonScanMode) { onCartonQrScanned(data.trim()); return; }
+
   // Exact match only — trim whitespace
   const norm    = data.trim();
   const parts   = norm.split(' / ');
@@ -2336,6 +3104,15 @@ function onQrScanned(data) {
   const qrGsm   = (parts[1]||'').replace(/^GSM-/i,'').trim();
   const hasRoll = /ROLL\s*\d+/i.test(parts[2]||'');
   const scan    = window._pickScan || [];
+
+  // Reject if this roll was already issued in a previous pick (and not returned)
+  if (window._issuedQrSet && window._issuedQrSet.has(norm.toUpperCase())) {
+    showScanError('❌ Roll ni dah pernah dikeluarkan');
+    const inp = document.getElementById('scan-manual-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+    if (_scanStream) { _scanRAF = requestAnimationFrame(tickScan); }
+    return;
+  }
 
   // Auto-detect matching item (bulk mode) or use specific item index
   let item = null;
@@ -2495,7 +3272,7 @@ async function confirmFabricPick() {
     const totalRoll  = scan.reduce((s,it)=>s+it.needed,0);
     const totalMeterAll = scan.reduce((s,it)=>s+(it.meter||0),0);
 
-    // Show success screen with Print DO + Dispatch buttons
+    // Show success screen with Dispatch button (Print DO only after driver assigned)
     document.getElementById('modal-sheet').innerHTML = `
       <div class="modal-handle"></div>
       <div style="padding:2rem 1.25rem 1.5rem">
@@ -2503,14 +3280,11 @@ async function confirmFabricPick() {
           <div style="font-size:2.8rem;margin-bottom:.5rem">✅</div>
           <div style="font-size:1.1rem;font-weight:800;color:var(--green);margin-bottom:.25rem">${totalRoll} Roll Diterbitkan</div>
           <div style="font-size:.78rem;color:var(--muted)">Ref: ${window._pickRef || '—'} &nbsp;·&nbsp; Jumlah ${totalMeterAll.toFixed(1)}m</div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem;font-family:monospace">${doNo}</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem;font-family:monospace">${doNo} (akan dijana selepas driver assign)</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:.5rem">
           <button onclick="openDispatchModal('${doNo}')" style="width:100%;padding:.75rem;background:var(--orange);border:none;border-radius:10px;color:#fff;font-size:.9rem;font-weight:800;cursor:pointer">🚐 Dispatch ke Fleet</button>
-          <div style="display:flex;gap:.5rem">
-            <button onclick="closeModal()" style="flex:1;padding:.65rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;cursor:pointer">Tutup</button>
-            <button onclick="printFabricDO()" style="flex:1;padding:.65rem;background:var(--cyan);border:none;border-radius:10px;color:#fff;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Print DO</button>
-          </div>
+          <button onclick="closeModal()" style="width:100%;padding:.65rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;cursor:pointer">Tutup</button>
         </div>
       </div>`;
     loadPickRequests();
@@ -2546,7 +3320,7 @@ async function printFabricDO(reqId) {
     ]);
     if (!r) { toast('❌ Request tidak ditemui'); return; }
     const date = r.reviewed_at ? new Date(r.reviewed_at) : new Date();
-    const refSuffix = (r.order_ref||'').replace('FABRIC|','').replace(/^—$/,'').trim() || r.id.slice(-4).toUpperCase();
+    const refSuffix = (r.order_ref||'').replace('FABRIC|','').replace(/^REQ-\d{8}-/, '').replace(/^—$/,'').trim() || r.id.slice(-4).toUpperCase();
     const doNo = 'DO-' + date.getFullYear() + ('0'+(date.getMonth()+1)).slice(-2) + ('0'+date.getDate()).slice(-2) + '-' + refSuffix;
     let info = {}; try { info = JSON.parse(r.reason||'{}'); } catch(e) {}
     const scan = (info.items||[]).map(function(it){ return { code: it.code, gsm: it.gsm, needed: it.rolls, meter: it.meter||0, scanned: [] }; });
@@ -2636,10 +3410,237 @@ async function printFabricDO(reqId) {
   if (w) { w.document.write(html); w.document.close(); }
 }
 
+/* ── REGISTER CARTON (SCAN MODE) ─────────────────────── */
+let _cartonScanMode = null; // { orderRef, firstReqId, doNo, scanned: Set }
+
+async function openRegisterCarton(orderRef, dest, firstReqId) {
+  // Fetch actual do_no/sto_no from cartons table (label may have been printed on a different date)
+  let doNo = orderRef.replace(/^REQ-/, 'DO-');
+  const { data: cartonRows } = await sb.from('cartons')
+    .select('do_no, sto_no')
+    .eq('batch_no', orderRef)
+    .eq('status', 'registered')
+    .limit(1);
+  if (cartonRows && cartonRows[0]) {
+    doNo = cartonRows[0].do_no || cartonRows[0].sto_no || doNo;
+  }
+
+  _cartonScanMode = { orderRef, firstReqId, doNo, scanned: new Set() };
+  _lastScanData = null;
+
+  // Set up scan overlay for carton mode
+  document.getElementById('scan-title').textContent = '📋 Scan Carton — ' + orderRef;
+  document.getElementById('scan-hint').textContent = 'Arahkan ke QR pada label carton';
+  renderCartonScanList();
+
+  document.getElementById('scan-overlay').style.display = 'flex';
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(function(stream) {
+      _scanStream = stream;
+      const video = document.getElementById('scan-video');
+      video.srcObject = stream; video.play();
+      _scanRAF = requestAnimationFrame(tickScan);
+    }).catch(function() {
+      // Camera not available — still open with manual input only
+    });
+  setTimeout(function() {
+    const inp = document.getElementById('scan-manual-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+  }, 300);
+}
+
+function renderCartonScanList() {
+  const el = document.getElementById('scan-roll-list');
+  if (!el || !_cartonScanMode) return;
+  const count = _cartonScanMode.scanned.size;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem .5rem .5rem;border-bottom:1px solid #1e293b;margin-bottom:.4rem">
+      <span style="font-size:.75rem;color:#94a3b8">${_cartonScanMode.orderRef}</span>
+      <span style="font-size:.88rem;font-weight:800;color:${count>0?'#10b981':'#f97316'}">${count} carton</span>
+    </div>
+    ${count === 0
+      ? '<div style="font-size:.72rem;color:#64748b;text-align:center;padding:.5rem">Belum ada carton diimbas</div>'
+      : [..._cartonScanMode.scanned].map(function(c){
+          return '<div style="font-size:.72rem;color:#10b981;padding:.15rem .5rem">✅ ' + c + '</div>';
+        }).join('')
+    }
+    ${count > 0
+      ? `<button onclick="confirmCartonScan()" style="width:100%;margin-top:.5rem;padding:.55rem;background:#10b981;border:none;border-radius:8px;color:#fff;font-size:.82rem;font-weight:700;cursor:pointer">✅ Selesai (${count} carton)</button>`
+      : ''
+    }`;
+}
+
+async function confirmCartonScan() {
+  if (!_cartonScanMode) return;
+  const count = _cartonScanMode.scanned.size;
+  if (count < 1) { showScanError('Imbas sekurang-kurangnya 1 carton'); return; }
+
+  const { data: row } = await sb.from('production_material_requests')
+    .select('notes').eq('id', _cartonScanMode.firstReqId).single();
+  const oldNotes = (row?.notes || '').replace(/\|\|CARTON:\d+/, '').trim();
+  const newNotes = (oldNotes ? oldNotes + ' ' : '') + '||CARTON:' + count;
+
+  const { error } = await sb.from('production_material_requests')
+    .update({ notes: newNotes }).eq('id', _cartonScanMode.firstReqId);
+
+  if (error) { showScanError(error.message); return; }
+  _cartonScanMode = null;
+  stopScan();
+  toast('✅ ' + count + ' carton didaftarkan');
+  loadDispatchList();
+}
+
+function onCartonQrScanned(data) {
+  // QR format from carton label: C{num}|{doNo or batchNo}|{num}/{total}|{date}
+  // QR was generated with encodeURIComponent — decode before parsing
+  try { data = decodeURIComponent(data); } catch(e) {}
+  const parts = data.split('|');
+  const cartonField = parts[0] || ''; // e.g. "C1"
+  const refField    = parts[1] || ''; // e.g. "DO-20260625-001"
+  const mode = _cartonScanMode;
+
+  // Validate: refField must match doNo or orderRef
+  const isMatch = refField === mode.doNo || refField === mode.orderRef;
+  if (!isMatch) {
+    showScanError('Bukan carton untuk ' + mode.orderRef);
+    setTimeout(function(){ _lastScanData = null; }, 2500);
+    return;
+  }
+
+  // Duplicate check — check if cartonField already scanned (set stores full QR string)
+  const alreadyScanned = [...mode.scanned].some(function(s){ return s.split('|')[0] === cartonField; });
+  if (alreadyScanned) {
+    showScanError('Carton ' + cartonField + ' dah imbas');
+    setTimeout(function(){ _lastScanData = null; }, 2000);
+    return;
+  }
+
+  mode.scanned.add(data); // store full QR string e.g. "C1|DO-20260625-001|1/2|25 Jun 2026"
+  renderCartonScanList();
+  // Flash green hint
+  const hint = document.getElementById('scan-hint');
+  if (hint) {
+    const prev = hint.textContent;
+    hint.textContent = '✅ ' + cartonField + ' diimbas';
+    hint.style.color = '#10b981';
+    setTimeout(function(){ hint.textContent = 'Arahkan ke QR pada label carton'; hint.style.color = ''; _lastScanData = null; }, 1500);
+  }
+}
+
 /* ════════════════════════════════════════════
    STICKER GENERATOR
 ════════════════════════════════════════════ */
-async function openDispatchModal(doNo, prefillDest, reqId) {
+function printCartonLabel(ctx) {
+  const d = ctx || window._lastCartonLabel;
+  if (!d) return;
+
+  // Show carton count input modal first
+  const INP = 'width:100%;padding:.55rem .7rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;outline:none;text-align:center;font-weight:700';
+  openModal(`
+    <div class="modal-handle"></div>
+    <div style="padding:1.5rem 1.25rem">
+      <div class="modal-title">🏷️ Label Carton</div>
+      <div style="font-size:.72rem;font-family:monospace;color:var(--cyan);margin-bottom:1.25rem">${d.doNo}</div>
+      <div style="margin-bottom:1.25rem">
+        <label style="font-size:.75rem;color:var(--muted);display:block;margin-bottom:.5rem;text-align:center">Berapa carton yang dah pack?</label>
+        <input id="carton-count" type="number" min="1" value="1" style="${INP}" placeholder="cth: 3">
+      </div>
+      <div style="font-size:.7rem;color:var(--muted);text-align:center;margin-bottom:1rem">Label akan dijanakan untuk setiap carton<br>(Carton 1/3, 2/3, 3/3...)</div>
+      <div style="display:flex;gap:.5rem">
+        <button onclick="closeModal()" style="flex:1;padding:.65rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;cursor:pointer">Batal</button>
+        <button onclick="generateCartonLabels()" style="flex:2;padding:.65rem;background:var(--cyan);border:none;border-radius:10px;color:#fff;font-size:.88rem;font-weight:700;cursor:pointer">🖨️ Jana &amp; Print</button>
+      </div>
+    </div>
+  `);
+}
+
+function generateCartonLabels() {
+  const total = parseInt(document.getElementById('carton-count')?.value) || 1;
+  const d = window._lastCartonLabel;
+  if (!d) return;
+  closeModal();
+
+  const itemRows = d.items.map(it =>
+    `<tr><td>${it.name}</td><td style="text-align:right;font-weight:700">${it.qty} ${it.unit}</td></tr>`
+  ).join('');
+
+  let labelsHtml = '';
+  for (let i = 1; i <= total; i++) {
+    labelsHtml += `
+    <div class="label-page">
+      <div class="border-box">
+        <div class="header">
+          <div class="company">KHATAM</div>
+          <div class="label-title">CARTON LABEL — RAW MATERIAL</div>
+        </div>
+        <div class="carton-no">Carton ${i} / ${total}</div>
+        <div class="do-no">${d.doNo}</div>
+        <div class="section">
+          <label>Delivery to</label>
+          <div class="val">${d.dest || '—'}</div>
+        </div>
+        <div class="section">
+          <label>Items</label>
+          <table>
+            <tr><th>Material</th><th>Qty</th></tr>
+            ${itemRows}
+          </table>
+        </div>
+        <div class="footer">
+          <span>📅 ${d.date}</span>
+          <span>👤 ${d.staff}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Carton Labels ${d.doNo}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial,sans-serif;background:#fff;color:#000}
+    .label-page{width:100mm;padding:12px;page-break-after:always}
+    .label-page:last-child{page-break-after:auto}
+    .border-box{border:2px solid #000;padding:10px;border-radius:4px}
+    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:8px}
+    .company{font-size:15px;font-weight:900;letter-spacing:1px}
+    .label-title{font-size:9px;color:#555;margin-top:2px}
+    .carton-no{text-align:center;font-size:22px;font-weight:900;background:#000;color:#fff;padding:6px;border-radius:4px;margin:8px 0;letter-spacing:2px}
+    .do-no{font-size:12px;font-weight:700;font-family:monospace;margin:6px 0;text-align:center;letter-spacing:1px;color:#333}
+    .section{margin-bottom:6px}
+    .section label{font-size:8px;color:#777;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:1px}
+    .section .val{font-size:12px;font-weight:700}
+    table{width:100%;border-collapse:collapse;margin-top:4px}
+    th{font-size:8px;text-transform:uppercase;color:#777;border-bottom:1px solid #ccc;padding:2px 0;text-align:left}
+    th:last-child{text-align:right}
+    td{font-size:11px;padding:3px 0;border-bottom:1px solid #eee}
+    .footer{margin-top:8px;padding-top:6px;border-top:1px solid #ccc;font-size:8px;color:#888;display:flex;justify-content:space-between}
+    @media print{.label-page{width:100mm} @page{size:100mm auto;margin:0}}
+  </style></head><body>
+  ${labelsHtml}
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+async function printCartonLabelFromDB(orderRef, dest) {
+  const { data: reqs } = await sb.from('production_material_requests')
+    .select('qty_issued, material:material_id(name, unit)')
+    .eq('order_ref', orderRef);
+  if (!reqs || !reqs.length) { alert('Data tidak jumpa.'); return; }
+  const items = reqs.map(r => ({ name: r.material?.name || '—', qty: r.qty_issued || '—', unit: r.material?.unit || '' }));
+  const doNo = orderRef.replace(/^REQ-/, 'DO-');
+  window._lastCartonLabel = {
+    doNo, dest, items,
+    date: new Date().toLocaleDateString('ms-MY'),
+    staff: _user?.full_name || _user?.username || '—'
+  };
+  printCartonLabel();
+}
+
+async function openDispatchModal(doNo, prefillDest, reqId, isRawmat) {
+  window._dispatchIsRawmat = !!isRawmat;
   const destination = prefillDest || window._pickDestination || '';
   const INP = 'width:100%;padding:.55rem .7rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;outline:none';
 
@@ -2650,9 +3651,8 @@ async function openDispatchModal(doNo, prefillDest, reqId) {
       <div style="font-size:.72rem;font-family:monospace;color:var(--cyan);margin-bottom:1.25rem">${doNo}</div>
 
       <div style="margin-bottom:.75rem">
-        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:.3rem">Hantar ke</label>
-        <div style="padding:.55rem .7rem;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:.85rem;font-weight:700;color:var(--text)">${destination || '—'}</div>
-        <input id="disp-dest" type="hidden" value="${destination}">
+        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:.3rem">Delivery to</label>
+        <input id="disp-dest" type="text" placeholder="cth: Production Floor A" value="${destination}" style="${INP}">
       </div>
 
       <div style="margin-bottom:1rem">
@@ -2676,8 +3676,9 @@ async function saveDispatch(doNo) {
   if (!dest) { errEl.textContent = '❌ Sila isi destinasi.'; errEl.style.display='block'; return; }
   errEl.style.display = 'none';
 
+  const legVal = 1; // rawmat/inbound/outbound = direct pick up, always Leg 1
   const { error } = await sb.from('fleet_trips').insert({
-    do_no: doNo, destination: dest, notes: notes || null, status: 'Assigned', leg: 1
+    do_no: doNo, destination: dest, notes: notes || null, status: 'Assigned', leg: legVal
   });
   if (error) { errEl.textContent = '❌ ' + error.message; errEl.style.display='block'; return; }
 
