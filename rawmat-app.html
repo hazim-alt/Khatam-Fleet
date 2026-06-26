@@ -3515,7 +3515,7 @@ function onCartonQrScanned(data) {
   const isMatch = refField === mode.doNo || refField === mode.orderRef;
   if (!isMatch) {
     showScanError('Bukan carton untuk ' + mode.orderRef);
-    setTimeout(function(){ _lastScanData = null; }, 2500);
+    setTimeout(function(){ _lastScanData = null; if (_scanStream) _scanRAF = requestAnimationFrame(tickScan); }, 2500);
     return;
   }
 
@@ -3523,19 +3523,27 @@ function onCartonQrScanned(data) {
   const alreadyScanned = [...mode.scanned].some(function(s){ return s.split('|')[0] === cartonField; });
   if (alreadyScanned) {
     showScanError('Carton ' + cartonField + ' dah imbas');
-    setTimeout(function(){ _lastScanData = null; }, 2000);
+    setTimeout(function(){ _lastScanData = null; if (_scanStream) _scanRAF = requestAnimationFrame(tickScan); }, 2000);
     return;
   }
 
   mode.scanned.add(data); // store full QR string e.g. "C1|DO-20260625-001|1/2|25 Jun 2026"
   renderCartonScanList();
-  // Flash green hint
+  // Flash green hint then reset for next scan
   const hint = document.getElementById('scan-hint');
   if (hint) {
-    const prev = hint.textContent;
     hint.textContent = '✅ ' + cartonField + ' diimbas';
     hint.style.color = '#10b981';
-    setTimeout(function(){ hint.textContent = 'Arahkan ke QR pada label carton'; hint.style.color = ''; _lastScanData = null; }, 1500);
+    setTimeout(function() {
+      hint.textContent = 'Arahkan ke QR pada label carton';
+      hint.style.color = '';
+      _lastScanData = null;
+      // Restart camera loop to allow scanning next carton
+      if (_scanStream) _scanRAF = requestAnimationFrame(tickScan);
+    }, 1500);
+  } else {
+    // No hint element — restart immediately
+    setTimeout(function() { _lastScanData = null; if (_scanStream) _scanRAF = requestAnimationFrame(tickScan); }, 1500);
   }
 }
 
