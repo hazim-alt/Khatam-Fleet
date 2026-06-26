@@ -3414,16 +3414,8 @@ async function printFabricDO(reqId) {
 let _cartonScanMode = null; // { orderRef, firstReqId, doNo, scanned: Set }
 
 async function openRegisterCarton(orderRef, dest, firstReqId) {
-  // Fetch actual do_no/sto_no from cartons table (label may have been printed on a different date)
-  let doNo = orderRef.replace(/^REQ-/, 'DO-');
-  const { data: cartonRows } = await sb.from('cartons')
-    .select('do_no, sto_no')
-    .eq('batch_no', orderRef)
-    .eq('status', 'registered')
-    .limit(1);
-  if (cartonRows && cartonRows[0]) {
-    doNo = cartonRows[0].do_no || cartonRows[0].sto_no || doNo;
-  }
+  // Derive doNo directly from orderRef — cartons are registered by staff scan, not pre-inserted
+  const doNo = orderRef.replace(/^(REQ|RQM|RQF)-/, 'DO-');
 
   _cartonScanMode = { orderRef, firstReqId, doNo, scanned: new Set() };
   _lastScanData = null;
@@ -3475,15 +3467,35 @@ async function confirmCartonScan() {
   const count = _cartonScanMode.scanned.size;
   if (count < 1) { showScanError('Imbas sekurang-kurangnya 1 carton'); return; }
 
+  const mode = _cartonScanMode;
+
+  // Build carton rows from scanned QR data: "C{num}|{doNo}|{i}/{total}|{date}"
+  const cartonRows = [...mode.scanned].map(function(qr) {
+    const parts = qr.split('|');
+    const cartonNum = parseInt((parts[0] || '').replace(/^C/i, '')) || 0;
+    const total = parseInt((parts[2] || '1/1').split('/')[1]) || count;
+    return {
+      do_no:         mode.doNo,
+      batch_no:      mode.orderRef,
+      carton_no:     cartonNum,
+      total_cartons: total,
+      barcode:       qr,
+      status:        'registered'
+    };
+  });
+
+  // Delete old registrations for this batch, then insert fresh
+  await sb.from('cartons').delete().eq('batch_no', mode.orderRef).eq('status', 'registered');
+  const { error: insErr } = await sb.from('cartons').insert(cartonRows);
+  if (insErr) { showScanError(insErr.message); return; }
+
+  // Also stamp carton count into request notes (used by dispatch screen check)
   const { data: row } = await sb.from('production_material_requests')
-    .select('notes').eq('id', _cartonScanMode.firstReqId).single();
+    .select('notes').eq('id', mode.firstReqId).single();
   const oldNotes = (row?.notes || '').replace(/\|\|CARTON:\d+/, '').trim();
   const newNotes = (oldNotes ? oldNotes + ' ' : '') + '||CARTON:' + count;
+  await sb.from('production_material_requests').update({ notes: newNotes }).eq('id', mode.firstReqId);
 
-  const { error } = await sb.from('production_material_requests')
-    .update({ notes: newNotes }).eq('id', _cartonScanMode.firstReqId);
-
-  if (error) { showScanError(error.message); return; }
   _cartonScanMode = null;
   stopScan();
   toast('✅ ' + count + ' carton didaftarkan');
