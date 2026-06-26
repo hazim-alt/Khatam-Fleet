@@ -866,8 +866,9 @@ function renderHistoryList(items) {
     const accentColor = isFab ? 'var(--orange)' : 'var(--purple)';
     const typeLabel = isFab ? '🧵 Fabric Roll' : '📦 Raw Material';
     const dateStr = h.date.toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' });
-    const statusBadge = h.tripStatus
-      ? '<span style="background:' + (tripColor[h.tripStatus]||'var(--muted)') + '20;color:' + (tripColor[h.tripStatus]||'var(--muted)') + ';font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:99px">🚚 ' + h.tripStatus + '</span>'
+    const effectiveTripStatus = (h.status === 'Rejected') ? null : h.tripStatus; // Rejected overrides trip status
+    const statusBadge = effectiveTripStatus
+      ? '<span style="background:' + (tripColor[effectiveTripStatus]||'var(--muted)') + '20;color:' + (tripColor[effectiveTripStatus]||'var(--muted)') + ';font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:99px">🚚 ' + effectiveTripStatus + '</span>'
       : '<span style="background:' + (statusColor[h.status]||'rgba(255,255,255,.1)') + '20;color:' + (statusColor[h.status]||'var(--muted)') + ';font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:99px">' + h.status + '</span>';
 
     const itemsHtml = (h.items || []).map(function(it) {
