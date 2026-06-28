@@ -3164,12 +3164,6 @@ function onQrScanned(data) {
     return;
   }
 
-  // Valid — in bulk mode keep camera running; in single mode stop
-  if (!_scanAllMode && _scanStream) {
-    cancelAnimationFrame(_scanRAF); _scanRAF = null;
-    _scanStream.getTracks().forEach(t=>t.stop()); _scanStream = null;
-    document.getElementById('scan-video').srcObject = null;
-  }
   _lastScanData = null;
 
   const pickErrEl = document.getElementById('pick-err');
@@ -3201,8 +3195,11 @@ function onQrScanned(data) {
     renderScanRollList(_scanItemIdx);
     const allItemDone = item.scanned.length >= item.needed;
     if (allItemDone) {
+      // All rolls for this item done — stop camera and close overlay
+      if (_scanStream) { cancelAnimationFrame(_scanRAF); _scanRAF = null; _scanStream.getTracks().forEach(t=>t.stop()); _scanStream = null; document.getElementById('scan-video').srcObject = null; }
       document.getElementById('scan-overlay').style.display = 'none';
     } else {
+      // More rolls still needed — keep camera running, just update title
       const inp = document.getElementById('scan-manual-input');
       if (inp) { inp.value = ''; inp.focus(); }
       document.getElementById('scan-title').textContent = 'Scan Roll ' + (item.scanned.length + 1) + ' — ' + item.code + ' ' + item.gsm;
