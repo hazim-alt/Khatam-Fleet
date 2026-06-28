@@ -949,8 +949,12 @@ async function loadStockCount() {
     const poNo = ref.slice(0, fd).trim();
     const sku = skuByPo[poNo] || '';
     if (!fabMap[key]) fabMap[key] = { gsm, code, sku, inCount: 0, outCount: 0 };
-    if (mv.type === 'in')  fabMap[key].inCount++;
-    if (mv.type === 'out') fabMap[key].outCount++;
+    if (mv.type === 'in') {
+      fabMap[key].inCount++;
+    } else if (mv.type === 'out') {
+      const outRollMatch = ref.match(/(\d+)\s*roll/i);
+      fabMap[key].outCount += outRollMatch ? parseInt(outRollMatch[1]) : 1;
+    }
   });
   const fabItems = Object.values(fabMap).filter(function(f){ return (f.inCount - f.outCount) > 0 || true; })
     .sort(function(a,b){ return a.gsm.localeCompare(b.gsm) || a.code.localeCompare(b.code); });
