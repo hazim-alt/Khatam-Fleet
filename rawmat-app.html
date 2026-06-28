@@ -3058,9 +3058,8 @@ function tickScan() {
   const code    = window.jsQR && jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
   if (code && code.data) {
     onQrScanned(code.data);
-    return;
   }
-  _scanRAF = requestAnimationFrame(tickScan);
+  if (_scanStream) _scanRAF = requestAnimationFrame(tickScan);
 }
 
 function stopScan() {
