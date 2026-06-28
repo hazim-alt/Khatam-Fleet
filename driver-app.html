@@ -2205,7 +2205,9 @@ async function viewCombinedPOD(tripIds) {
   document.getElementById('pod-sub').textContent = doNums + ' — ' + dest;
   document.getElementById('screen-pod').setAttribute('data-trip-id', tripIds[0]);
   document.getElementById('screen-pod').setAttribute('data-combined-trip-ids', tripIds.join(','));
-  document.getElementById('btn-delivered').style.display = '';
+  var btnDlv = document.getElementById('btn-delivered');
+  btnDlv.style.display = '';
+  btnDlv.disabled = false; btnDlv.textContent = '✅ Delivered';
   clearPodPhoto();
   document.getElementById('pod-photo-card').style.display = 'block';
   document.getElementById('pod-photo-btn').style.display = '';
@@ -2338,7 +2340,9 @@ async function viewPOD(tripId, readOnly) {
   }
 
   document.getElementById('screen-pod').setAttribute('data-trip-id', tripId);
-  document.getElementById('btn-delivered').style.display = readOnly ? 'none' : '';
+  var btnDlv2 = document.getElementById('btn-delivered');
+  btnDlv2.style.display = readOnly ? 'none' : '';
+  btnDlv2.disabled = false; btnDlv2.textContent = '✅ Delivered';
   showScreen('screen-pod');
 }
 
@@ -2350,11 +2354,23 @@ function onPodPhotoChosen(input) {
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function(e) {
-    _podPhotoDataUrl = e.target.result;
-    var img = document.getElementById('pod-photo-img');
-    img.src = _podPhotoDataUrl;
-    document.getElementById('pod-photo-preview').style.display = 'block';
-    document.getElementById('pod-photo-btn').textContent = '📷 Tukar Gambar';
+    // Compress to max 800px wide, JPEG 70% quality to keep payload small
+    var rawUrl = e.target.result;
+    var tmpImg = new Image();
+    tmpImg.onload = function() {
+      var canvas = document.createElement('canvas');
+      var maxW = 800;
+      var ratio = Math.min(1, maxW / tmpImg.width);
+      canvas.width  = Math.round(tmpImg.width  * ratio);
+      canvas.height = Math.round(tmpImg.height * ratio);
+      canvas.getContext('2d').drawImage(tmpImg, 0, 0, canvas.width, canvas.height);
+      _podPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.70);
+      var img = document.getElementById('pod-photo-img');
+      img.src = _podPhotoDataUrl;
+      document.getElementById('pod-photo-preview').style.display = 'block';
+      document.getElementById('pod-photo-btn').textContent = '📷 Tukar Gambar';
+    };
+    tmpImg.src = rawUrl;
   };
   reader.readAsDataURL(file);
   // Reset input so same file can be chosen again
@@ -2402,8 +2418,14 @@ async function confirmDelivered() {
     loadTrip();
   } catch(err) {
     console.error('confirmDelivered error:', err);
-    alert('Ralat: ' + (err.message || err));
     btn.disabled = false; btn.textContent = '✅ Delivered';
+    // Show error inline instead of alert (alert can be blocked on mobile)
+    var errMsg = err.message || String(err) || 'Ralat tidak diketahui';
+    var errEl = document.createElement('div');
+    errEl.style.cssText = 'color:#ef4444;font-size:.8rem;text-align:center;margin-top:.5rem;padding:.5rem;background:rgba(239,68,68,.1);border-radius:8px';
+    errEl.textContent = '❌ Ralat: ' + errMsg;
+    btn.parentNode.insertBefore(errEl, btn.nextSibling);
+    setTimeout(function(){ if (errEl.parentNode) errEl.parentNode.removeChild(errEl); }, 5000);
   }
 }
 
