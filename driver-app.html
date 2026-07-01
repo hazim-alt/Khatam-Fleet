@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ms">
 <head>
@@ -642,13 +643,22 @@ function renderTrip(showBack) {
   content.appendChild(card);
 
   if (_trip.status === 'Assigned') {
-    const scanBtn = document.createElement('button');
-    scanBtn.className = 'action-btn btn-scan';
-    scanBtn.textContent = _currentTab === 'delivery'
-      ? (_lang === 'ms' ? '📦 Mula Scan Carton Delivery' : '📦 Start Carton Scan (Delivery)')
-      : t('startScan');
-    scanBtn.addEventListener('click', openScan);
-    content.appendChild(scanBtn);
+    const _isProTrip = (_trip.do_no || '').startsWith('PRO-');
+    if (_isProTrip) {
+      const departBtn = document.createElement('button');
+      departBtn.className = 'action-btn btn-scan';
+      departBtn.textContent = '🚐 Depart';
+      departBtn.addEventListener('click', doDepart);
+      content.appendChild(departBtn);
+    } else {
+      const scanBtn = document.createElement('button');
+      scanBtn.className = 'action-btn btn-scan';
+      scanBtn.textContent = _currentTab === 'delivery'
+        ? (_lang === 'ms' ? '📦 Mula Scan Carton Delivery' : '📦 Start Carton Scan (Delivery)')
+        : t('startScan');
+      scanBtn.addEventListener('click', openScan);
+      content.appendChild(scanBtn);
+    }
   } else if (_trip.status === 'Departed') {
     // Show carton scan summary
     loadDeliveryCartonBadge(card);
@@ -664,8 +674,24 @@ function renderTrip(showBack) {
     // Leg 1 → Drop at Warehouse + Direct Delivery (boutique) OR Scan + Arrived (fabric DO)
     if (_trip.leg === 1) {
       if (_trip._isFabricDO) {
+        const _isProTrip2 = (_trip.do_no || '').startsWith('PRO-');
         const allScanned = _trip._fabricTotalRolls > 0 && _trip._fabricScannedCount >= _trip._fabricTotalRolls;
-        if (allScanned) {
+        if (_isProTrip2) {
+          const proReceived = localStorage.getItem('pro_received_' + _trip.id) === '1';
+          const proBtn = document.createElement('button');
+          proBtn.className = 'action-btn btn-arrived';
+          proBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
+          if (proReceived) {
+            proBtn.style.background = '#10b981';
+            proBtn.textContent = '📍 Mark as Arrived';
+            proBtn.addEventListener('click', doFabricArrived);
+          } else {
+            proBtn.style.background = '#f59e0b';
+            proBtn.textContent = '📥 Receive Item';
+            proBtn.addEventListener('click', function() { proReceiveItem(_trip.id); });
+          }
+          content.appendChild(proBtn);
+        } else if (allScanned) {
           const fabArrBtn = document.createElement('button');
           fabArrBtn.className = 'action-btn btn-arrived';
           fabArrBtn.style.cssText = 'width:100%;max-width:420px;padding:.9rem;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.5rem';
@@ -1608,9 +1634,23 @@ async function doFabricArrived() {
   if (error) { alert('Error: ' + error.message); return; }
   if (_trip.vehicle_id) await sb.from('fleet_vehicles').update({ status: 'Available' }).eq('id', _trip.vehicle_id);
   await sb.from('fleet_drivers').update({ status: 'Available' }).eq('id', _driver.id);
+  // Clean up PRO- receive flag
+  localStorage.removeItem('pro_received_' + _trip.id);
   document.getElementById('trip-map-wrap').style.display = 'none';
   _trip.status = 'Arrived';
   viewPOD(_trip.id);
+}
+
+// ── PRO- TRIP: RECEIVE ITEM (step before Mark as Arrived) ─
+function proReceiveItem(tripId) {
+  localStorage.setItem('pro_received_' + tripId, '1');
+  // If this is the active single trip view, re-render it
+  if (_trip && _trip.id === tripId) {
+    renderTrip();
+  } else {
+    // Re-render the delivery list
+    renderDeliveryList();
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -1902,8 +1942,20 @@ function buildDeliveryItem(trip, idx) {
   if (trip.leg === 1) {
     // Leg 1 departed: fabric DO → scan then arrived; boutique → drop at warehouse or direct delivery
     if (trip._isFabricDO) {
+      const _isProTrip3 = (trip.do_no || '').startsWith('PRO-');
       const allFabricScanned = trip._fabricTotalRolls > 0 && trip._fabricScannedCount >= trip._fabricTotalRolls;
-      if (allFabricScanned) {
+      if (_isProTrip3) {
+        const proReceived3 = localStorage.getItem('pro_received_' + trip.id) === '1';
+        if (proReceived3) {
+          actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
+            + '<button class="btn-arrived-sm" style="background:#10b981" onclick="doFabricArrivedForTrip(\'' + trip.id + '\')">📍 Mark as Arrived</button>'
+            + '</div>';
+        } else {
+          actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
+            + '<button class="btn-arrived-sm" style="background:#f59e0b" onclick="proReceiveItem(\'' + trip.id + '\')">📥 Receive Item</button>'
+            + '</div>';
+        }
+      } else if (allFabricScanned) {
         actionHTML = '<div style="display:flex;flex-direction:column;gap:.4rem">'
           + '<button class="btn-arrived-sm" style="background:#10b981" onclick="doFabricArrivedForTrip(\'' + trip.id + '\')">📍 Mark as Arrived</button>'
           + '</div>';
