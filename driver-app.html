@@ -2313,12 +2313,15 @@ async function viewPOD(tripId, readOnly) {
     .eq('id', tripId).single();
   var trip = fresh || _allTrips.find(function(t){ return t.id === tripId; });
   if (!trip) return;
-  var [reqRes, cartonByDo] = await Promise.all([
+  var isProDo = (trip.do_no || '').startsWith('PRO-');
+  var [reqRes, cartonByDo, proOrderRes] = await Promise.all([
     sb.from('stock_requests').select('id, do_no, batch_no, request_no, from_b:from_boutique_id(name), to_b:to_boutique_id(name)').eq('do_no', trip.do_no),
-    sb.from('cartons').select('barcode, carton_no, total_cartons').eq('do_no', trip.do_no)
+    sb.from('cartons').select('barcode, carton_no, total_cartons').eq('do_no', trip.do_no),
+    isProDo ? sb.from('production_orders').select('dispatch_cartons').eq('order_no', trip.do_no).single() : Promise.resolve({ data: null })
   ]);
   var req = reqRes.data && reqRes.data[0] ? reqRes.data[0] : null;
   var cartons = cartonByDo.data || [];
+  var proCartons = proOrderRes.data ? (proOrderRes.data.dispatch_cartons || 0) : 0;
   // Fallback: fetch by batch_no if no cartons found via do_no
   if (!cartons.length && reqRes.data && reqRes.data.length) {
     var bkeys = reqRes.data.map(function(r){ return r.batch_no || r.request_no; }).filter(Boolean);
@@ -2328,6 +2331,7 @@ async function viewPOD(tripId, readOnly) {
     }
   }
   var fmt = function(d){ return d ? new Date(d).toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'; };
+  var totalCartonsDisplay = isProDo ? (proCartons || '—') : (cartons.length || '—');
 
   document.getElementById('pod-details').innerHTML = [
     ['DO No.', trip.do_no || '—'],
@@ -2335,9 +2339,9 @@ async function viewPOD(tripId, readOnly) {
     ['To', trip.destination || '—'],
     ['Driver', _driver ? _driver.name : '—'],
     ['Arrived', fmt(trip.arrival_time)],
-    ['Confirmed By', trip.pod_confirmed_by || '—'],
+    ['Confirmed By', trip.receiver_name || trip.pod_confirmed_by || '—'],
     ['POD Timestamp', fmt(trip.pod_confirmed_at)],
-    ['Total Cartons', cartons.length || '—']
+    ['Total Cartons', totalCartonsDisplay]
   ].map(function(r){ return '<div class="pod-row"><span class="pod-label">' + r[0] + '</span><span class="pod-value">' + r[1] + '</span></div>'; }).join('');
 
   if (cartons.length) {
