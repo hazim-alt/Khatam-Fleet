@@ -298,6 +298,12 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <button id="pod-photo-btn" class="action-btn btn-secondary" style="max-width:100%;margin-top:0" onclick="document.getElementById('pod-photo-input').click()">📷 Ambil Gambar</button>
   </div>
 
+  <div id="pod-receiver-card" class="pod-card" style="width:100%;max-width:420px">
+    <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.06em">👤 Nama Penerima <span style="color:#ef4444">*</span></div>
+    <input type="text" id="pod-receiver-input" placeholder="Nama penerima barang..." autocomplete="off"
+      style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;color:var(--text);font-size:.9rem;outline:none"/>
+  </div>
+
   <button id="btn-delivered" class="action-btn" style="max-width:420px;margin-top:.5rem;background:#10b981" onclick="confirmDelivered()">✅ Delivered</button>
   <button class="action-btn btn-secondary" style="max-width:420px;margin-top:.5rem" onclick="closePOD()">← Back</button>
 </div>
@@ -2395,6 +2401,16 @@ async function viewPOD(tripId, readOnly) {
   var btnDlv2 = document.getElementById('btn-delivered');
   btnDlv2.style.display = readOnly ? 'none' : '';
   btnDlv2.disabled = false; btnDlv2.textContent = '✅ Delivered';
+  // Receiver name input: hide in read-only, show + pre-fill if already saved
+  var rcvCard = document.getElementById('pod-receiver-card');
+  var rcvInput = document.getElementById('pod-receiver-input');
+  if (readOnly) {
+    rcvCard.style.display = 'none';
+  } else {
+    rcvCard.style.display = 'block';
+    rcvInput.value = trip.receiver_name || '';
+    rcvInput.style.borderColor = 'var(--border)';
+  }
   showScreen('screen-pod');
 }
 
@@ -2436,7 +2452,14 @@ function clearPodPhoto() {
   document.getElementById('pod-photo-btn').textContent = '📷 Ambil Gambar';
 }
 
-function closePOD() { clearPodPhoto(); document.getElementById('screen-pod').removeAttribute('data-combined-trip-ids'); showScreen('screen-home'); if (_currentTab === 'delivery') renderDeliveryList(); }
+function closePOD() {
+  clearPodPhoto();
+  var rcvInput = document.getElementById('pod-receiver-input');
+  if (rcvInput) { rcvInput.value = ''; rcvInput.style.borderColor = 'var(--border)'; }
+  document.getElementById('screen-pod').removeAttribute('data-combined-trip-ids');
+  showScreen('screen-home');
+  if (_currentTab === 'delivery') renderDeliveryList();
+}
 
 async function confirmDelivered() {
   var podScreen = document.getElementById('screen-pod');
@@ -2445,11 +2468,20 @@ async function confirmDelivered() {
   var combinedStr = podScreen.getAttribute('data-combined-trip-ids');
   var allTripIds = combinedStr ? combinedStr.split(',') : [tripId];
   var btn = document.getElementById('btn-delivered');
+  // Validate receiver name
+  var rcvInput = document.getElementById('pod-receiver-input');
+  var receiverName = (rcvInput ? rcvInput.value : '').trim();
+  if (!receiverName) {
+    if (rcvInput) { rcvInput.style.borderColor = '#ef4444'; rcvInput.focus(); }
+    return;
+  }
+  if (rcvInput) rcvInput.style.borderColor = 'var(--border)';
+
   btn.disabled = true; btn.textContent = '⏳ Menyimpan...';
 
   try {
     var now = new Date().toISOString();
-    var update = { status: 'Delivered', pod_confirmed_at: now };
+    var update = { status: 'Delivered', pod_confirmed_at: now, receiver_name: receiverName };
     if (_podPhotoDataUrl) update.pod_photo = _podPhotoDataUrl;
     // Update all trips (single or combined)
     var { error } = await sb.from('fleet_trips').update(update).in('id', allTripIds);
